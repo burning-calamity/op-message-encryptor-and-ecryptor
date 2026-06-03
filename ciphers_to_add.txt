@@ -14,8 +14,8 @@ Classical substitution / hand ciphers
 9. Chaocipher [ADDED]
 10. Checkerboard transposition [ADDED]
 11. Chiffre Indechiffrable variants
-12. Cistercian numerals
-13. Clave cipher
+12. Cistercian numerals [ADDED]
+13. Clave cipher [ADDED]
 14. Codebook substitution with user dictionary [ADDED]
 15. Condi cipher [ADDED]
 16. Damm cipher/check digit codec [ADDED: Damm Check]
@@ -35,7 +35,7 @@ Classical substitution / hand ciphers
 30. Keyphrase transposition cipher
 31. Latin alphabet reverse with custom alphabets [ADDED]
 32. Letter-number A1Z26 variants [ADDED: basic A1Z26]
-33. Lorenz-style toy cipher
+33. Lorenz-style toy cipher [ADDED: Lorenz Toy]
 34. M-94 / Jefferson disk cipher [ADDED: Jefferson Disk]
 35. Monome-dinome cipher [ADDED]
 36. Morbit cipher [ADDED]
@@ -43,10 +43,10 @@ Classical substitution / hand ciphers
 38. Nihilist substitution variants
 39. Null cipher / acrostic cipher [ADDED: Null Acrostic]
 40. Phillips cipher [ADDED]
-41. Phillips RC cipher
+41. Phillips RC cipher [ADDED]
 42. Pollux cipher [ADDED]
 43. Progressive key cipher [ADDED]
-44. Quagmire V/VI experimental variants
+44. Quagmire V/VI experimental variants [ADDED]
 45. Ragbaby cipher [ADDED]
 46. Redefence cipher [ADDED]
 47. Running-key with book text loader [ADDED: parameterized book text]
@@ -54,7 +54,7 @@ Classical substitution / hand ciphers
 49. Slidefair cipher [ADDED]
 50. Solitaire/Pontifex with exact test-vector mode
 51. Straddling checkerboard with configurable row digits [ADDED]
-52. Swagman cipher
+52. Swagman cipher [ADDED]
 53. Tri-square cipher [ADDED]
 54. Trifid 6x6 variant
 55. Trithemius cipher [ADDED]
@@ -71,12 +71,12 @@ Classical substitution / hand ciphers
 
 Transposition / route ciphers
 -----------------------------
-66. Alternating columnar transposition
-67. Auto-route spiral variants
-68. Boustrophedon route cipher
+66. Alternating columnar transposition [ADDED]
+67. Auto-route spiral variants [ADDED: Spiral Inward/Outward Route]
+68. Boustrophedon route cipher [ADDED]
 69. Cadenus cipher [ADDED]
-70. Columnar with padding policy options
-71. Complete columnar transposition
+70. Columnar with padding policy options [ADDED: Columnar Padded]
+71. Complete columnar transposition [ADDED]
 72. Disrupted transposition
 73. Double columnar with irregular columns
 74. Fleissner grille / turning grille
@@ -89,7 +89,7 @@ Transposition / route ciphers
 81. Reading-order route presets
 82. Redefence / rail-fence with key order
 83. Rotating square route cipher
-84. Route cipher with inward/outward spiral options
+84. Route cipher with inward/outward spiral options [ADDED]
 85. Scytale with padding modes
 86. Skip / permutation cipher [ADDED]
 87. Spiral route cipher [ADDED]

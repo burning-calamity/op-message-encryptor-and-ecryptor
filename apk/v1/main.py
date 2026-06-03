@@ -32,6 +32,7 @@ class CipherMobileRoot(BoxLayout):
         self.param_inputs: Dict[str, TextInput] = {}
 
         self.add_widget(self._build_filter_bar())
+        self.add_widget(self._build_category_bar())
         self.add_widget(self._build_toolbar())
         self.add_widget(self._build_params_panel())
         self.add_widget(self._build_text_panels())
@@ -43,10 +44,25 @@ class CipherMobileRoot(BoxLayout):
 
     def _build_filter_bar(self) -> BoxLayout:
         bar = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(42), spacing=dp(8))
-        bar.add_widget(Label(text="Search", size_hint_x=0.2))
-        self.search_input = TextInput(hint_text="Filter ciphers", multiline=False, size_hint_x=0.8)
+        bar.add_widget(Label(text="Search", size_hint_x=0.18))
+        self.search_input = TextInput(hint_text="Name, parameter, or default", multiline=False, size_hint_x=0.62)
         self.search_input.bind(text=lambda *_: self._filter_ciphers())
         bar.add_widget(self.search_input)
+        clear_search_btn = Button(text="Clear", size_hint_x=0.2)
+        clear_search_btn.bind(on_release=lambda *_: self._clear_search())
+        bar.add_widget(clear_search_btn)
+        return bar
+
+    def _build_category_bar(self) -> BoxLayout:
+        bar = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(42), spacing=dp(8))
+        bar.add_widget(Label(text="Group", size_hint_x=0.18))
+        self.category_spinner = Spinner(
+            text="All",
+            values=("All", "Classical", "Vigenere", "Transposition", "Morse/Symbol", "Encoding", "Checksums/Hash", "Modern", "Fun"),
+            size_hint_x=0.82,
+        )
+        self.category_spinner.bind(text=lambda *_: self._filter_ciphers())
+        bar.add_widget(self.category_spinner)
         return bar
 
     def _build_toolbar(self) -> BoxLayout:
@@ -84,8 +100,9 @@ class CipherMobileRoot(BoxLayout):
         return self.status_label
 
     def _build_actions(self) -> BoxLayout:
-        actions = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(96), spacing=dp(8))
+        actions = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(144), spacing=dp(8))
         left = BoxLayout(orientation="vertical", spacing=dp(6))
+        middle = BoxLayout(orientation="vertical", spacing=dp(6))
         right = BoxLayout(orientation="vertical", spacing=dp(6))
 
         run_btn = Button(text="Run")
@@ -94,6 +111,10 @@ class CipherMobileRoot(BoxLayout):
         guess_btn.bind(on_release=lambda *_: self._smart_guess())
         analyze_btn = Button(text="Analyze")
         analyze_btn.bind(on_release=lambda *_: self._analyze_input())
+        info_btn = Button(text="Info")
+        info_btn.bind(on_release=lambda *_: self._show_cipher_info())
+        selftest_btn = Button(text="Self-test")
+        selftest_btn.bind(on_release=lambda *_: self._run_selftest())
         swap_btn = Button(text="Swap")
         swap_btn.bind(on_release=lambda *_: self._swap_text())
         paste_btn = Button(text="Paste")
@@ -103,25 +124,61 @@ class CipherMobileRoot(BoxLayout):
         clear_btn = Button(text="Clear")
         clear_btn.bind(on_release=lambda *_: self._clear_text())
 
-        for button in (run_btn, guess_btn, analyze_btn, swap_btn):
+        for button in (run_btn, guess_btn, analyze_btn):
             left.add_widget(button)
+        for button in (info_btn, selftest_btn, swap_btn):
+            middle.add_widget(button)
         for button in (paste_btn, copy_btn, clear_btn):
             right.add_widget(button)
         actions.add_widget(left)
+        actions.add_widget(middle)
         actions.add_widget(right)
         return actions
 
 
+    def _entry_search_blob(self, entry) -> str:
+        param_bits = []
+        for param in entry.params:
+            param_bits.extend((param.name, param.label, param.default))
+        return " ".join([entry.name, *param_bits]).lower()
+
+    def _entry_matches_category(self, entry) -> bool:
+        category = getattr(self, "category_spinner", None)
+        selected = category.text if category else "All"
+        if selected == "All":
+            return True
+        name = entry.name.lower()
+        groups = {
+            "Classical": ("caesar", "affine", "atbash", "substitution", "porta", "beaufort", "bacon", "nihilist", "chaocipher", "clave", "phillips"),
+            "Vigenere": ("vigenere", "autokey", "running key", "gronsfeld", "quagmire", "trithemius", "progressive key"),
+            "Transposition": ("rail", "route", "columnar", "scytale", "swagman", "cadenus", "checkerboard", "spiral", "boustrophedon", "redefence"),
+            "Morse/Symbol": ("morse", "pigpen", "tap", "knock", "baudot", "braille", "semaphore", "cistercian", "nato", "apco"),
+            "Encoding": ("base", "hex", "url", "unicode", "quoted", "punycode", "netstring", "bencode", "data uri", "z85", "ascii"),
+            "Checksums/Hash": ("crc", "adler", "fletcher", "sha", "md5", "hmac", "pbkdf", "scrypt", "hkdf", "hotp", "totp", "luhn", "damm", "verhoeff"),
+            "Modern": ("rc4", "chacha", "salsa", "tea", "speck", "simon", "rc5", "xxtea", "lorenz"),
+            "Fun": ("leet", "emoji", "upside", "zalgo", "rune", "aurebesh", "theban", "ogham", "pig latin", "backslang", "calculator"),
+        }
+        return any(token in name for token in groups.get(selected, ()))
+
     def _filter_ciphers(self) -> None:
         query = getattr(self, "search_input", None)
         needle = query.text.strip().lower() if query else ""
-        names = [entry.name for entry in self.registry if needle in entry.name.lower()]
+        names = [
+            entry.name
+            for entry in self.registry
+            if self._entry_matches_category(entry) and (not needle or needle in self._entry_search_blob(entry))
+        ]
         if not names:
-            names = [entry.name for entry in self.registry]
+            names = [entry.name for entry in self.registry if self._entry_matches_category(entry)] or [entry.name for entry in self.registry]
         self.cipher_spinner.values = names
         if self.cipher_spinner.text not in names:
             self.cipher_spinner.text = names[0]
-        self.status_label.text = f"{len(names)} / {len(self.registry)} ciphers" if hasattr(self, "status_label") else ""
+        if hasattr(self, "status_label"):
+            self.status_label.text = f"{len(names)} / {len(self.registry)} ciphers"
+
+    def _clear_search(self) -> None:
+        self.search_input.text = ""
+        self._filter_ciphers()
 
     def _refresh_params(self) -> None:
         self.params_box.clear_widgets()
@@ -180,6 +237,28 @@ class CipherMobileRoot(BoxLayout):
             f"Top letters: {top}"
         )
         self.status_label.text = "Analysis complete"
+
+    def _show_cipher_info(self) -> None:
+        entry = self.registry_by_name[self.cipher_spinner.text]
+        if entry.params:
+            params = "\n".join(f"- {p.label} ({p.name}) default={p.default!r}" for p in entry.params)
+        else:
+            params = "No parameters"
+        self.output_text.text = (
+            f"Cipher: {entry.name}\n"
+            f"Mode: {self.mode_spinner.text}\n"
+            f"Parameters:\n{params}"
+        )
+        self.status_label.text = f"Info for {entry.name}"
+
+    def _run_selftest(self) -> None:
+        try:
+            passed, total = encripter._selftest()
+            self.output_text.text = f"Self-test: {passed}/{total} checks passed"
+            self.status_label.text = "Self-test complete"
+        except Exception as exc:
+            self.output_text.text = f"Err:{exc}"
+            self.status_label.text = "Self-test error"
 
     def _paste_input(self) -> None:
         self.input_text.text = Clipboard.paste()

@@ -1012,6 +1012,364 @@ def Cadenus_decode(text: str, key: str = "CADENUS", height: int | str = 25, pad:
         out.extend("".join(row) for row in grid)
     return "".join(out).rstrip((pad or "X")[0])
 
+
+
+def Clave_encode(text: str, key: str = "CLAVE", alphabet_key: str = "CIPHER", keep_others: bool = True) -> str:
+    alpha = rotate_alpha_from_keyword(alphabet_key)
+    key_vals = [alpha.index(ch) for ch in to_upper(key) if ch in alpha]
+    if not key_vals:
+        return "Err:key must contain letters"
+    out = []
+    ki = 0
+    for ch in text:
+        cu = ch.upper()
+        if cu in ALPHA_SET:
+            p = alpha.index(cu)
+            mapped = alpha[(p + key_vals[ki % len(key_vals)]) % 26]
+            out.append(mapped if ch.isupper() else mapped.lower())
+            ki += 1
+        else:
+            out.append(ch if keep_others else "")
+    return "".join(out)
+
+
+def Clave_decode(text: str, key: str = "CLAVE", alphabet_key: str = "CIPHER", keep_others: bool = True) -> str:
+    alpha = rotate_alpha_from_keyword(alphabet_key)
+    key_vals = [alpha.index(ch) for ch in to_upper(key) if ch in alpha]
+    if not key_vals:
+        return "Err:key must contain letters"
+    out = []
+    ki = 0
+    for ch in text:
+        cu = ch.upper()
+        if cu in ALPHA_SET:
+            c = alpha.index(cu)
+            mapped = alpha[(c - key_vals[ki % len(key_vals)]) % 26]
+            out.append(mapped if ch.isupper() else mapped.lower())
+            ki += 1
+        else:
+            out.append(ch if keep_others else "")
+    return "".join(out)
+
+
+def PhillipsRC_encode(text: str, key: str = "PHILLIPS", period: int | str = 5, keep_others: bool = True) -> str:
+    period = max(1, int(period))
+    out = []
+    n = 0
+    for ch in text:
+        cu = 'I' if ch.upper() == 'J' else ch.upper()
+        if cu in "ABCDEFGHIKLMNOPQRSTUVWXYZ":
+            pos, rev = _phillips_square_for_group(key, n // period)
+            r, c = pos[cu]
+            mapped = rev[((r + 1) % 5, (c + 1) % 5)]
+            out.append(mapped if ch.isupper() else mapped.lower())
+            n += 1
+        else:
+            out.append(ch if keep_others else "")
+    return "".join(out)
+
+
+def PhillipsRC_decode(text: str, key: str = "PHILLIPS", period: int | str = 5, keep_others: bool = True) -> str:
+    period = max(1, int(period))
+    out = []
+    n = 0
+    for ch in text:
+        cu = 'I' if ch.upper() == 'J' else ch.upper()
+        if cu in "ABCDEFGHIKLMNOPQRSTUVWXYZ":
+            pos, rev = _phillips_square_for_group(key, n // period)
+            r, c = pos[cu]
+            mapped = rev[((r - 1) % 5, (c - 1) % 5)]
+            out.append(mapped if ch.isupper() else mapped.lower())
+            n += 1
+        else:
+            out.append(ch if keep_others else "")
+    return "".join(out)
+
+
+def _key_permutation(key: str) -> List[int]:
+    clean = [ch for ch in str(key) if ch.strip()]
+    if not clean:
+        clean = list("123")
+    if all(ch.isdigit() for ch in clean) and len(set(clean)) == len(clean):
+        return [idx for idx, _ in sorted(enumerate([int(ch) for ch in clean]), key=lambda item: (item[1], item[0]))]
+    return [idx for idx, _ in sorted(enumerate(clean), key=lambda item: (item[1], item[0]))]
+
+
+def Swagman_encode(text: str, key: str = "3142", pad: str = "X") -> str:
+    order = _key_permutation(key)
+    width = len(order)
+    padch = (pad or "X")[0]
+    s = "".join(ch for ch in text if not ch.isspace())
+    if len(s) % width:
+        s += padch * (width - len(s) % width)
+    out = []
+    for off in range(0, len(s), width):
+        block = s[off:off + width]
+        out.extend(block[i] for i in order)
+    return "".join(out)
+
+
+def Swagman_decode(text: str, key: str = "3142", pad: str = "X") -> str:
+    order = _key_permutation(key)
+    width = len(order)
+    if len(text) % width:
+        return "Err:ciphertext length must be a multiple of key length"
+    out = []
+    for off in range(0, len(text), width):
+        block = text[off:off + width]
+        plain = [""] * width
+        for cipher_pos, plain_pos in enumerate(order):
+            plain[plain_pos] = block[cipher_pos]
+        out.extend(plain)
+    return "".join(out).rstrip((pad or "X")[0])
+
+
+def AlternatingColumnar_encode(text: str, key: str = "CIPHER") -> str:
+    s = "".join(ch for ch in text if not ch.isspace())
+    cols = len(key) or 1
+    rows = math.ceil(len(s) / cols)
+    grid = [[""] * cols for _ in range(rows)]
+    idx = 0
+    for r in range(rows):
+        for c in range(cols):
+            if idx < len(s):
+                grid[r][c] = s[idx]
+                idx += 1
+    out = []
+    for n, c in enumerate(_stable_column_order(key)):
+        rng = range(rows) if n % 2 == 0 else range(rows - 1, -1, -1)
+        for r in rng:
+            if grid[r][c]:
+                out.append(grid[r][c])
+    return "".join(out)
+
+
+def AlternatingColumnar_decode(text: str, key: str = "CIPHER") -> str:
+    s = text
+    cols = len(key) or 1
+    rows = math.ceil(len(s) / cols)
+    short = rows * cols - len(s)
+    counts = {c: rows - (1 if c >= cols - short and short else 0) for c in range(cols)}
+    grid = [[""] * cols for _ in range(rows)]
+    idx = 0
+    for n, c in enumerate(_stable_column_order(key)):
+        rng = list(range(rows) if n % 2 == 0 else range(rows - 1, -1, -1))
+        present = [r for r in rng if r < counts[c]]
+        for r in present:
+            grid[r][c] = s[idx]
+            idx += 1
+    return "".join(grid[r][c] for r in range(rows) for c in range(cols) if grid[r][c])
+
+
+def BoustrophedonRoute_encode(text: str, rows: int | str = 5, cols: int | str = 5, pad: str = "X") -> str:
+    rows, cols = int(rows), int(cols)
+    if rows <= 0 or cols <= 0:
+        return "Err:rows and cols must be positive"
+    block = rows * cols
+    padch = (pad or "X")[0]
+    s = text
+    if len(s) % block:
+        s += padch * (block - len(s) % block)
+    out = []
+    for off in range(0, len(s), block):
+        grid = [list(s[off + r * cols:off + (r + 1) * cols]) for r in range(rows)]
+        for r, row in enumerate(grid):
+            out.extend(row if r % 2 == 0 else reversed(row))
+    return "".join(out)
+
+
+def BoustrophedonRoute_decode(text: str, rows: int | str = 5, cols: int | str = 5, pad: str = "X") -> str:
+    rows, cols = int(rows), int(cols)
+    if rows <= 0 or cols <= 0:
+        return "Err:rows and cols must be positive"
+    block = rows * cols
+    if len(text) % block:
+        return "Err:ciphertext length must be a multiple of rows*cols"
+    out = []
+    for off in range(0, len(text), block):
+        chunk = text[off:off + block]
+        grid = [[""] * cols for _ in range(rows)]
+        idx = 0
+        for r in range(rows):
+            col_range = range(cols) if r % 2 == 0 else range(cols - 1, -1, -1)
+            for c in col_range:
+                grid[r][c] = chunk[idx]
+                idx += 1
+        out.extend("".join(row) for row in grid)
+    return "".join(out).rstrip((pad or "X")[0])
+
+
+
+def CistercianNumerals_encode(text: str) -> str:
+    return " ".join(f"[C{ord(ch):04d}]" if ord(ch) <= 9999 else f"[U{ord(ch):06X}]" for ch in text)
+
+
+def CistercianNumerals_decode(text: str) -> str:
+    out = []
+    for token in text.replace("][", "] [").split():
+        if token.startswith("[C") and token.endswith("]"):
+            out.append(chr(int(token[2:-1])))
+        elif token.startswith("[U") and token.endswith("]"):
+            out.append(chr(int(token[2:-1], 16)))
+        else:
+            out.append(token)
+    return "".join(out)
+
+
+def _lorenz_stream(seed: str, wheels: str = "41,31,29,26,23"):
+    periods = [max(2, int(x.strip())) for x in str(wheels).split(",") if x.strip()]
+    if not periods:
+        periods = [41, 31, 29, 26, 23]
+    state = sum((i + 1) * ord(ch) for i, ch in enumerate(seed or "LORENZ")) or 1
+    positions = [state % p for p in periods]
+    while True:
+        bitmix = 0
+        for i, p in enumerate(periods):
+            positions[i] = (positions[i] + 1 + (state % (i + 3))) % p
+            bitmix ^= ((positions[i] * (i + 5) + state) % 26)
+        state = (state * 1103515245 + 12345 + bitmix) & 0x7FFFFFFF
+        yield bitmix % 26
+
+
+def LorenzToy_encode(text: str, seed: str = "LORENZ", wheels: str = "41,31,29,26,23", keep_others: bool = True) -> str:
+    stream = _lorenz_stream(seed, wheels)
+    out = []
+    for ch in text:
+        cu = ch.upper()
+        if cu in ALPHA_SET:
+            k = next(stream)
+            mapped = ALPHA[(ALPHA.index(cu) + k) % 26]
+            out.append(mapped if ch.isupper() else mapped.lower())
+        else:
+            out.append(ch if keep_others else "")
+    return "".join(out)
+
+
+def LorenzToy_decode(text: str, seed: str = "LORENZ", wheels: str = "41,31,29,26,23", keep_others: bool = True) -> str:
+    stream = _lorenz_stream(seed, wheels)
+    out = []
+    for ch in text:
+        cu = ch.upper()
+        if cu in ALPHA_SET:
+            k = next(stream)
+            mapped = ALPHA[(ALPHA.index(cu) - k) % 26]
+            out.append(mapped if ch.isupper() else mapped.lower())
+        else:
+            out.append(ch if keep_others else "")
+    return "".join(out)
+
+
+def CompleteColumnar_encode(text: str, key: str = "CIPHER", pad: str = "X") -> str:
+    cols = len(key) or 1
+    padch = (pad or "X")[0]
+    s = "".join(ch for ch in text if not ch.isspace())
+    if len(s) % cols:
+        s += padch * (cols - len(s) % cols)
+    return Columnar_encode(s, key)
+
+
+def CompleteColumnar_decode(text: str, key: str = "CIPHER", pad: str = "X") -> str:
+    return Columnar_decode(text, key).rstrip((pad or "X")[0])
+
+
+def ColumnarPadded_encode(text: str, key: str = "CIPHER", pad: str = "X", policy: str = "minimal") -> str:
+    cols = len(key) or 1
+    padch = (pad or "X")[0]
+    s = "".join(ch for ch in text if not ch.isspace())
+    policy = str(policy or "minimal").lower()
+    need = (-len(s)) % cols
+    if policy == "full" and need == 0:
+        need = cols
+    if policy != "none":
+        s += padch * need
+    return Columnar_encode(s, key)
+
+
+def ColumnarPadded_decode(text: str, key: str = "CIPHER", pad: str = "X", policy: str = "minimal") -> str:
+    plain = Columnar_decode(text, key)
+    return plain if str(policy or "minimal").lower() == "none" else plain.rstrip((pad or "X")[0])
+
+
+def _spiral_positions(rows: int, cols: int) -> List[Tuple[int, int]]:
+    top, bottom, left, right = 0, rows - 1, 0, cols - 1
+    pos: List[Tuple[int, int]] = []
+    while top <= bottom and left <= right:
+        for c in range(left, right + 1):
+            pos.append((top, c))
+        top += 1
+        for r in range(top, bottom + 1):
+            pos.append((r, right))
+        right -= 1
+        if top <= bottom:
+            for c in range(right, left - 1, -1):
+                pos.append((bottom, c))
+            bottom -= 1
+        if left <= right:
+            for r in range(bottom, top - 1, -1):
+                pos.append((r, left))
+            left += 1
+    return pos
+
+
+def SpiralInwardRoute_encode(text: str, rows: int | str = 5, cols: int | str = 5, pad: str = "X") -> str:
+    rows, cols = int(rows), int(cols)
+    block = rows * cols
+    padch = (pad or "X")[0]
+    s = text
+    if len(s) % block:
+        s += padch * (block - len(s) % block)
+    positions = _spiral_positions(rows, cols)
+    out = []
+    for off in range(0, len(s), block):
+        grid = [list(s[off + r * cols:off + (r + 1) * cols]) for r in range(rows)]
+        out.extend(grid[r][c] for r, c in positions)
+    return "".join(out)
+
+
+def SpiralInwardRoute_decode(text: str, rows: int | str = 5, cols: int | str = 5, pad: str = "X") -> str:
+    rows, cols = int(rows), int(cols)
+    block = rows * cols
+    if len(text) % block:
+        return "Err:ciphertext length must be a multiple of rows*cols"
+    positions = _spiral_positions(rows, cols)
+    out = []
+    for off in range(0, len(text), block):
+        grid = [[""] * cols for _ in range(rows)]
+        for ch, (r, c) in zip(text[off:off + block], positions):
+            grid[r][c] = ch
+        out.extend("".join(row) for row in grid)
+    return "".join(out).rstrip((pad or "X")[0])
+
+
+def SpiralOutwardRoute_encode(text: str, rows: int | str = 5, cols: int | str = 5, pad: str = "X") -> str:
+    rows, cols = int(rows), int(cols)
+    block = rows * cols
+    padch = (pad or "X")[0]
+    s = text
+    if len(s) % block:
+        s += padch * (block - len(s) % block)
+    positions = list(reversed(_spiral_positions(rows, cols)))
+    out = []
+    for off in range(0, len(s), block):
+        grid = [list(s[off + r * cols:off + (r + 1) * cols]) for r in range(rows)]
+        out.extend(grid[r][c] for r, c in positions)
+    return "".join(out)
+
+
+def SpiralOutwardRoute_decode(text: str, rows: int | str = 5, cols: int | str = 5, pad: str = "X") -> str:
+    rows, cols = int(rows), int(cols)
+    block = rows * cols
+    if len(text) % block:
+        return "Err:ciphertext length must be a multiple of rows*cols"
+    positions = list(reversed(_spiral_positions(rows, cols)))
+    out = []
+    for off in range(0, len(text), block):
+        grid = [[""] * cols for _ in range(rows)]
+        for ch, (r, c) in zip(text[off:off + block], positions):
+            grid[r][c] = ch
+        out.extend("".join(row) for row in grid)
+    return "".join(out).rstrip((pad or "X")[0])
+
 # =============================================================================
 # Vigenère family
 # =============================================================================
@@ -5062,7 +5420,7 @@ def Pigpen_decode(text: str) -> str:
     return "".join(out)
 
 # =============================================================================
-# Quagmire I–IV
+# Quagmire I–VI
 # =============================================================================
 
 def _mixed_alpha(key: Optional[str]) -> str:
@@ -5133,6 +5491,62 @@ def QuagmireIV_decode(text: str, runkey: str = "QUEENLY", indicator: str = "INDI
     rk = only_alpha(runkey)
     rk = rk[shift:] + rk[:shift]
     return _quag_decrypt(text, rk, pa, _mixed_alpha(cipher_key))
+
+
+def _rotate_alpha_to_indicator(alpha: str, indicator: str) -> str:
+    marker = only_alpha(indicator)[:1] or alpha[:1]
+    if marker not in alpha:
+        marker = alpha[:1]
+    idx = alpha.index(marker)
+    return alpha[idx:] + alpha[:idx]
+
+
+def QuagmireV_encode(text: str, runkey: str = "QUEENLY", plain_key: str = "PLAIN", cipher_key: str = "CIPHER", plain_indicator: str = "A", cipher_indicator: str = "A") -> str:
+    plain_alpha = _rotate_alpha_to_indicator(_mixed_alpha(plain_key), plain_indicator)
+    cipher_alpha = _rotate_alpha_to_indicator(_mixed_alpha(cipher_key), cipher_indicator)
+    return _quag_encrypt(text, runkey, plain_alpha, cipher_alpha)
+
+
+def QuagmireV_decode(text: str, runkey: str = "QUEENLY", plain_key: str = "PLAIN", cipher_key: str = "CIPHER", plain_indicator: str = "A", cipher_indicator: str = "A") -> str:
+    plain_alpha = _rotate_alpha_to_indicator(_mixed_alpha(plain_key), plain_indicator)
+    cipher_alpha = _rotate_alpha_to_indicator(_mixed_alpha(cipher_key), cipher_indicator)
+    return _quag_decrypt(text, runkey, plain_alpha, cipher_alpha)
+
+
+def _quagmire_progressive(text: str, runkey: str, plain_alpha: str, cipher_alpha: str, step: int, enc: bool) -> str:
+    rk = only_alpha(runkey) or "A"
+    out = []
+    ki = 0
+    for ch in text:
+        cu = ch.upper()
+        if cu in ALPHA_SET:
+            shift = (ki * step) % 26
+            ca = cipher_alpha[shift:] + cipher_alpha[:shift]
+            row = plain_alpha.index(rk[ki % len(rk)])
+            row_alpha = ca[row:] + ca[:row]
+            if enc:
+                col = plain_alpha.index(cu)
+                mapped = row_alpha[col]
+            else:
+                col = row_alpha.index(cu)
+                mapped = plain_alpha[col]
+            out.append(mapped if ch.isupper() else mapped.lower())
+            ki += 1
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+def QuagmireVI_encode(text: str, runkey: str = "QUEENLY", plain_key: str = "PLAIN", cipher_key: str = "CIPHER", indicator: str = "A", step: int | str = 1) -> str:
+    plain_alpha = _mixed_alpha(plain_key)
+    cipher_alpha = _rotate_alpha_to_indicator(_mixed_alpha(cipher_key), indicator)
+    return _quagmire_progressive(text, runkey, plain_alpha, cipher_alpha, int(step), True)
+
+
+def QuagmireVI_decode(text: str, runkey: str = "QUEENLY", plain_key: str = "PLAIN", cipher_key: str = "CIPHER", indicator: str = "A", step: int | str = 1) -> str:
+    plain_alpha = _mixed_alpha(plain_key)
+    cipher_alpha = _rotate_alpha_to_indicator(_mixed_alpha(cipher_key), indicator)
+    return _quagmire_progressive(text, runkey, plain_alpha, cipher_alpha, int(step), False)
 
 # =============================================================================
 # Baconian / Grandpré / Nihilist / Homophonic / Fractionated Morse / Emoji /
@@ -6106,6 +6520,17 @@ def get_registry() -> List[CipherEntry]:
         CipherEntry("Seriated Playfair", SeriatedPlayfair_encode, SeriatedPlayfair_decode, [P("key","Key","KEYWORD"), P("period","Period","5")]),
         CipherEntry("Tri-Square", TriSquare_encode, TriSquare_decode, [P("key1","Key 1","ALPHA"), P("key2","Key 2","BRAVO"), P("key3","Key 3","CHARLIE")]),
         CipherEntry("Cadenus", Cadenus_encode, Cadenus_decode, [P("key","Key","CADENUS"), P("height","Height","25"), P("pad","Pad","X")]),
+        CipherEntry("Clave", Clave_encode, Clave_decode, [P("key","Key","CLAVE"), P("alphabet_key","Alphabet key","CIPHER")]),
+        CipherEntry("Phillips RC", PhillipsRC_encode, PhillipsRC_decode, [P("key","Square key","PHILLIPS"), P("period","Period","5")]),
+        CipherEntry("Swagman", Swagman_encode, Swagman_decode, [P("key","Permutation key","3142"), P("pad","Pad","X")]),
+        CipherEntry("Alternating Columnar", AlternatingColumnar_encode, AlternatingColumnar_decode, [P("key","Key","CIPHER")]),
+        CipherEntry("Boustrophedon Route", BoustrophedonRoute_encode, BoustrophedonRoute_decode, [P("rows","Rows","5"), P("cols","Cols","5"), P("pad","Pad","X")]),
+        CipherEntry("Cistercian Numerals", CistercianNumerals_encode, CistercianNumerals_decode, []),
+        CipherEntry("Lorenz Toy", LorenzToy_encode, LorenzToy_decode, [P("seed","Seed","LORENZ"), P("wheels","Wheel periods","41,31,29,26,23")]),
+        CipherEntry("Complete Columnar", CompleteColumnar_encode, CompleteColumnar_decode, [P("key","Key","CIPHER"), P("pad","Pad","X")]),
+        CipherEntry("Columnar Padded", ColumnarPadded_encode, ColumnarPadded_decode, [P("key","Key","CIPHER"), P("pad","Pad","X"), P("policy","Policy","minimal")]),
+        CipherEntry("Spiral Inward Route", SpiralInwardRoute_encode, SpiralInwardRoute_decode, [P("rows","Rows","5"), P("cols","Cols","5"), P("pad","Pad","X")]),
+        CipherEntry("Spiral Outward Route", SpiralOutwardRoute_encode, SpiralOutwardRoute_decode, [P("rows","Rows","5"), P("cols","Cols","5"), P("pad","Pad","X")]),
 
         # Vigenère family
         CipherEntry("Vigenere", Vigenere_encode, Vigenere_decode, [P("key","Key","LEMON")]),
@@ -6261,11 +6686,13 @@ def get_registry() -> List[CipherEntry]:
         CipherEntry("Pollux", Pollux_encode, Pollux_decode, []),
         CipherEntry("Pigpen", Pigpen_encode, Pigpen_decode, []),
 
-        # Quagmire I–IV
+        # Quagmire I–VI
         CipherEntry("Quagmire I", QuagmireI_encode, QuagmireI_decode, [P("runkey","Run-key","QUEENLY"), P("cipher_key","Cipher-key","CIPHER")]),
         CipherEntry("Quagmire II", QuagmireII_encode, QuagmireII_decode, [P("runkey","Run-key","QUEENLY"), P("plain_key","Plain-key","PLAIN")]),
         CipherEntry("Quagmire III", QuagmireIII_encode, QuagmireIII_decode, [P("runkey","Run-key","QUEENLY"), P("plain_key","Plain-key","PLAIN"), P("cipher_key","Cipher-key","CIPHER")]),
         CipherEntry("Quagmire IV", QuagmireIV_encode, QuagmireIV_decode, [P("runkey","Run-key","QUEENLY"), P("indicator","Indicator","INDICATOR"), P("plain_key","Plain-key","PLAIN"), P("cipher_key","Cipher-key","CIPHER")]),
+        CipherEntry("Quagmire V", QuagmireV_encode, QuagmireV_decode, [P("runkey","Run-key","QUEENLY"), P("plain_key","Plain-key","PLAIN"), P("cipher_key","Cipher-key","CIPHER"), P("plain_indicator","Plain indicator","A"), P("cipher_indicator","Cipher indicator","A")]),
+        CipherEntry("Quagmire VI", QuagmireVI_encode, QuagmireVI_decode, [P("runkey","Run-key","QUEENLY"), P("plain_key","Plain-key","PLAIN"), P("cipher_key","Cipher-key","CIPHER"), P("indicator","Indicator","A"), P("step","Step","1")]),
 
         # Numeric / fractionated
         CipherEntry("Baconian", Baconian_encode, Baconian_decode, []),
