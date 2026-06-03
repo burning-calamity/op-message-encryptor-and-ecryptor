@@ -83,19 +83,19 @@ Transposition / route ciphers
 75. Grille cipher from mask file
 76. Incomplete columnar transposition variants
 77. Myszkowski with duplicate-key policy modes
-78. Rail fence with offset
-79. Rail fence with spaces preserved
+78. Rail fence with offset [ADDED]
+79. Rail fence with spaces preserved [ADDED]
 80. Raster / bitmap route cipher
 81. Reading-order route presets
 82. Redefence / rail-fence with key order
 83. Rotating square route cipher
 84. Route cipher with inward/outward spiral options
 85. Scytale with padding modes
-86. Skip / permutation cipher
-87. Spiral route cipher
+86. Skip / permutation cipher [ADDED]
+87. Spiral route cipher [ADDED]
 88. Swagman transposition
 89. Turning cardan grille
-90. Vertical transposition with numeric key
+90. Vertical transposition with numeric key [ADDED]
 
 Polygraphic / matrix ciphers
 ----------------------------
@@ -130,27 +130,27 @@ Telegraph, radio, symbols, and novelty
 116. Maritime signal flags
 117. Braille Unicode codec [ADDED: Grade-1 letters]
 118. Grade-1 Braille text codec
-119. Moon type
+119. Moon type [ADDED]
 120. Pigpen graphical Unicode symbols
-121. Dancing Men cipher
-122. Music notes cipher
-123. Solresol
-124. Galactic alphabet / Standard Galactic Alphabet
-125. Aurebesh
-126. Theban alphabet
-127. Elder Futhark runes
-128. Younger Futhark runes
-129. Ogham script mapping
+121. Dancing Men cipher [ADDED]
+122. Music notes cipher [ADDED]
+123. Solresol [ADDED]
+124. Galactic alphabet / Standard Galactic Alphabet [ADDED: Standard Galactic]
+125. Aurebesh [ADDED]
+126. Theban alphabet [ADDED]
+127. Elder Futhark runes [ADDED]
+128. Younger Futhark runes [ADDED]
+129. Ogham script mapping [ADDED]
 130. Tolkien Cirth transliteration
 131. Tengwar transliteration mode
 132. Zodiac-style symbol substitution template
 133. Wingdings/Webdings mapping
-134. Calculator spelling
-135. Upside-down text
-136. Mirror text Unicode
-137. Zalgo text encoder/cleaner
-138. Invisible Unicode steganography
-139. Zero-width character binary codec
+134. Calculator spelling [ADDED]
+135. Upside-down text [ADDED]
+136. Mirror text Unicode [ADDED]
+137. Zalgo text encoder/cleaner [ADDED]
+138. Invisible Unicode steganography [ADDED]
+139. Zero-width character binary codec [ADDED]
 140. Emoji binary codec variants
 141. Emoji alphabet substitution packs
 142. Bacon biliteral typography steganography
@@ -159,84 +159,84 @@ Telegraph, radio, symbols, and novelty
 
 Encodings, bases, and binary transforms
 ---------------------------------------
-145. Base16 with separators
+145. Base16 with separators [ADDED]
 146. Base32 Crockford [ADDED]
-147. Base32hex
+147. Base32hex [ADDED]
 148. Base45 [ADDED]
-149. Base62
-150. Base91
-151. Base92
-152. Base100 emoji
-153. Z85 / ZeroMQ Base85
+149. Base62 [ADDED]
+150. Base91 [ADDED]
+151. Base92 [ADDED]
+152. Base100 emoji [ADDED]
+153. Z85 / ZeroMQ Base85 [ADDED: Z85]
 154. RFC 1924 IPv6 Base85
 155. Base2048
 156. Base32768
 157. Bech32 / Bech32m
-158. Punycode
+158. Punycode [ADDED]
 159. Quoted-printable [ADDED]
-160. uuencode/uudecode
-161. xxencode/xxdecode
-162. yEnc
-163. netstring codec
-164. Bencode codec
+160. uuencode/uudecode [ADDED]
+161. xxencode/xxdecode [ADDED]
+162. yEnc [ADDED]
+163. netstring codec [ADDED]
+164. Bencode codec [ADDED: string form]
 165. MessagePack hex wrapper
 166. ASN.1 DER hex parser/formatter
 167. PEM armor wrapper
 168. OpenPGP ASCII armor wrapper
 169. Intel HEX record codec
 170. Motorola S-record codec
-171. Varint / LEB128 codec
-172. Elias gamma coding
-173. Elias delta coding
-174. Fibonacci coding
-175. Golomb coding
+171. Varint / LEB128 codec [ADDED: LEB128]
+172. Elias gamma coding [ADDED]
+173. Elias delta coding [ADDED]
+174. Fibonacci coding [ADDED]
+175. Golomb coding [ADDED]
 176. Huffman toy codec
 177. Arithmetic coding toy codec
-178. RLE compression codec
-179. Burrows-Wheeler transform
-180. Move-to-front transform
+178. RLE compression codec [ADDED]
+179. Burrows-Wheeler transform [ADDED]
+180. Move-to-front transform [ADDED]
 181. LZ77 toy codec
 182. LZW toy codec
-183. DEFLATE wrapper
-184. gzip/zlib/base64 wrappers
-185. CRC append/verify wrappers
-186. Hexdump formatter/parser
-187. Binary with endian word grouping
-188. Octal escapes
-189. C string escapes
-190. JSON string escapes
+183. DEFLATE wrapper [ADDED: Zlib Base64]
+184. gzip/zlib/base64 wrappers [ADDED: Zlib Base64/Gzip Base64]
+185. CRC append/verify wrappers [ADDED: CRC32 wrapper]
+186. Hexdump formatter/parser [ADDED]
+187. Binary with endian word grouping [ADDED]
+188. Octal escapes [ADDED]
+189. C string escapes [ADDED]
+190. JSON string escapes [ADDED]
 191. XML entities extended
-192. URL form encoding plus query parser
-193. Data URI encoder/decoder
+192. URL form encoding plus query parser [ADDED: form encode/decode]
+193. Data URI encoder/decoder [ADDED]
 194. QR alphanumeric mode codec
 195. QR byte segment formatter
 196. Reed-Solomon toy encoder
-197. Hamming(7,4) codec
-198. Hamming(15,11) codec
-199. Parity-bit codec
-200. Gray code codec
+197. Hamming(7,4) codec [ADDED]
+198. Hamming(15,11) codec [ADDED]
+199. Parity-bit codec [ADDED]
+200. Gray code codec [ADDED]
 
 Hashing, checksums, and KDF helpers
 -----------------------------------
 201. MD2
 202. MD4
-203. MD5 wrapper with salted formats
-204. SHA-1/SHA-2/SHA-3 wrappers
+203. MD5 wrapper with salted formats [ADDED: MD5 wrapper]
+204. SHA-1/SHA-2/SHA-3 wrappers [ADDED: SHA1/SHA256/SHA3-256]
 205. BLAKE2b/BLAKE2s wrappers
 206. BLAKE3 optional dependency wrapper
 207. RIPEMD-160 optional wrapper
 208. Whirlpool optional wrapper
-209. CRC-8 variants
-210. CRC-16 variants
-211. CRC-32 variants
-212. CRC-64 variants
-213. Adler-32
-214. Fletcher-16/Fletcher-32
-215. Luhn checksum
-216. Verhoeff checksum
-217. Damm checksum
-218. HMAC wrapper
-219. PBKDF2 helper
+209. CRC-8 variants [ADDED]
+210. CRC-16 variants [ADDED: CRC16-CCITT]
+211. CRC-32 variants [ADDED: zlib CRC32]
+212. CRC-64 variants [ADDED: CRC64-ECMA]
+213. Adler-32 [ADDED]
+214. Fletcher-16/Fletcher-32 [ADDED]
+215. Luhn checksum [ADDED]
+216. Verhoeff checksum [ADDED]
+217. Damm checksum [ADDED]
+218. HMAC wrapper [ADDED]
+219. PBKDF2 helper [ADDED]
 220. scrypt helper
 221. Argon2 optional helper
 222. HKDF helper
@@ -349,7 +349,7 @@ Steganography and puzzle helpers
 320. Word ladder cipher
 321. Dictionary rank cipher
 322. Phone keypad/T9 cipher
-323. Multi-tap phone keypad
+323. Multi-tap phone keypad [ADDED]
 324. Vanity phone number codec
 325. Keyboard coordinate cipher
 326. QWERTY adjacency cipher variants
@@ -361,7 +361,7 @@ Steganography and puzzle helpers
 332. PDF417 generation/reading
 333. Barcode Code 39/128 codec
 334. Color square / RGB triplet codec
-335. Hex color text codec
+335. Hex color text codec [ADDED]
 336. DNA codon codec
 337. RNA codon codec
 338. Amino-acid one/three-letter codec
