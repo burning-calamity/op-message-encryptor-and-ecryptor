@@ -6,67 +6,67 @@ Classical substitution / hand ciphers
 1. AMSCO cipher
 2. Bazeries cipher
 3. Bifid variants: conjugated, 6x6, no-period mode
-4. Caesar with custom alphabet
-5. Caesar progressive shift
-6. Caesar random alphabet / keyed Caesar
-7. Caesar with mixed alphabet
-8. Caesar Della Porta disk variant
-9. Chaocipher
-10. Checkerboard transposition
+4. Caesar with custom alphabet [ADDED]
+5. Caesar progressive shift [ADDED]
+6. Caesar random alphabet / keyed Caesar [ADDED: Keyed Caesar]
+7. Caesar with mixed alphabet [ADDED: Caesar Custom Alphabet]
+8. Caesar Della Porta disk variant [ADDED: Della Porta Disk]
+9. Chaocipher [ADDED]
+10. Checkerboard transposition [ADDED]
 11. Chiffre Indechiffrable variants
 12. Cistercian numerals
 13. Clave cipher
-14. Codebook substitution with user dictionary
-15. Condi cipher
-16. Damm cipher/check digit codec
+14. Codebook substitution with user dictionary [ADDED]
+15. Condi cipher [ADDED]
+16. Damm cipher/check digit codec [ADDED: Damm Check]
 17. Delastelle Four-square variants
 18. Delastelle Trifid variants
 19. Digrafid cipher
-20. Dvorak keyboard substitution
+20. Dvorak keyboard substitution [ADDED]
 21. Foursquare 6x6 alphanumeric
 22. Gromark cipher
 23. Hagelin-style pinwheel toy cipher
 24. Headline puzzle cipher
 25. Homophonic frequency-weighted substitution
-26. Interrupted key cipher
-27. Kamasutra cipher
-28. Keyed alphabet with arbitrary alphabets
-29. Keyed Caesar progressive
+26. Interrupted key cipher [ADDED]
+27. Kamasutra cipher [ADDED]
+28. Keyed alphabet with arbitrary alphabets [ADDED]
+29. Keyed Caesar progressive [ADDED]
 30. Keyphrase transposition cipher
-31. Latin alphabet reverse with custom alphabets
+31. Latin alphabet reverse with custom alphabets [ADDED]
 32. Letter-number A1Z26 variants [ADDED: basic A1Z26]
 33. Lorenz-style toy cipher
-34. M-94 / Jefferson disk cipher
-35. Monome-dinome cipher
-36. Morbit cipher
-37. Nicodemus cipher
+34. M-94 / Jefferson disk cipher [ADDED: Jefferson Disk]
+35. Monome-dinome cipher [ADDED]
+36. Morbit cipher [ADDED]
+37. Nicodemus cipher [ADDED]
 38. Nihilist substitution variants
-39. Null cipher / acrostic cipher
-40. Phillips cipher
+39. Null cipher / acrostic cipher [ADDED: Null Acrostic]
+40. Phillips cipher [ADDED]
 41. Phillips RC cipher
-42. Pollux cipher
-43. Progressive key cipher
+42. Pollux cipher [ADDED]
+43. Progressive key cipher [ADDED]
 44. Quagmire V/VI experimental variants
-45. Ragbaby cipher
-46. Redefence cipher
-47. Running-key with book text loader
-48. Seriated Playfair
-49. Slidefair cipher
+45. Ragbaby cipher [ADDED]
+46. Redefence cipher [ADDED]
+47. Running-key with book text loader [ADDED: parameterized book text]
+48. Seriated Playfair [ADDED]
+49. Slidefair cipher [ADDED]
 50. Solitaire/Pontifex with exact test-vector mode
-51. Straddling checkerboard with configurable row digits
+51. Straddling checkerboard with configurable row digits [ADDED]
 52. Swagman cipher
-53. Tri-square cipher
+53. Tri-square cipher [ADDED]
 54. Trifid 6x6 variant
-55. Trithemius cipher
+55. Trithemius cipher [ADDED]
 56. Twin Bifid cipher
 57. Two-square horizontal/vertical variants
-58. Variant Beaufort with autokey
-59. Vigenere with custom alphabet
-60. Vigenere progressive-key
-61. Vigenere Beaufort tabula recta variants
+58. Variant Beaufort with autokey [ADDED: Variant Beaufort + autokey]
+59. Vigenere with custom alphabet [ADDED]
+60. Vigenere progressive-key [ADDED]
+61. Vigenere Beaufort tabula recta variants [ADDED: Beaufort Autokey]
 62. Wheatstone cryptograph simulator
-63. Word Caesar / vocabulary shift
-64. Word substitution dictionary cipher
+63. Word Caesar / vocabulary shift [ADDED]
+64. Word substitution dictionary cipher [ADDED]
 65. Zygalski-sheet inspired toy cipher
 
 Transposition / route ciphers
@@ -74,7 +74,7 @@ Transposition / route ciphers
 66. Alternating columnar transposition
 67. Auto-route spiral variants
 68. Boustrophedon route cipher
-69. Cadenus cipher
+69. Cadenus cipher [ADDED]
 70. Columnar with padding policy options
 71. Complete columnar transposition
 72. Disrupted transposition
@@ -120,12 +120,12 @@ Polygraphic / matrix ciphers
 
 Telegraph, radio, symbols, and novelty
 --------------------------------------
-109. Baudot ITA2
+109. Baudot ITA2 [ADDED]
 110. Murray code
-111. Tap code variants
-112. Knock code
+111. Tap code variants [ADDED: classic C/K tap code]
+112. Knock code [ADDED]
 113. NATO phonetic alphabet encode/decode [ADDED]
-114. APCO phonetic alphabet
+114. APCO phonetic alphabet [ADDED]
 115. Flag semaphore exact arm-pair notation
 116. Maritime signal flags
 117. Braille Unicode codec [ADDED: Grade-1 letters]
@@ -222,7 +222,7 @@ Hashing, checksums, and KDF helpers
 202. MD4
 203. MD5 wrapper with salted formats [ADDED: MD5 wrapper]
 204. SHA-1/SHA-2/SHA-3 wrappers [ADDED: SHA1/SHA256/SHA3-256]
-205. BLAKE2b/BLAKE2s wrappers
+205. BLAKE2b/BLAKE2s wrappers [ADDED]
 206. BLAKE3 optional dependency wrapper
 207. RIPEMD-160 optional wrapper
 208. Whirlpool optional wrapper
@@ -237,10 +237,10 @@ Hashing, checksums, and KDF helpers
 217. Damm checksum [ADDED]
 218. HMAC wrapper [ADDED]
 219. PBKDF2 helper [ADDED]
-220. scrypt helper
+220. scrypt helper [ADDED]
 221. Argon2 optional helper
-222. HKDF helper
-223. TOTP/HOTP code generator
+222. HKDF helper [ADDED]
+223. TOTP/HOTP code generator [ADDED]
 
 Modern symmetric ciphers / modes
 --------------------------------
