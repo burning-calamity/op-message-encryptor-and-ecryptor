@@ -26,3 +26,14 @@ Buildozer prerequisites are installed correctly.
 
 The original desktop Tkinter GUI in `encripter.py` is not used by the APK. The
 APK starts from `main.py`, which uses Kivy widgets instead.
+
+## Mobile UI features
+
+- Registry-driven cipher picker synchronized with the top-level `encripter.py`
+  engine, including the latest classical/transposition additions.
+- Search box for quickly filtering the large cipher list.
+- Dynamic parameter fields generated from each `CipherEntry`.
+- Encode/decode run mode plus Swap, Paste, Copy, and Clear actions.
+- SmartGuess button that displays the top ranked candidates for unknown text.
+- Analyze button with quick character, word, index-of-coincidence, and top-letter
+  statistics for ciphertext inspection on mobile.

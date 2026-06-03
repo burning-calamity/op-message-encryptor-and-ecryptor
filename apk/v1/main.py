@@ -31,12 +31,23 @@ class CipherMobileRoot(BoxLayout):
         self.registry_by_name = {entry.name: entry for entry in self.registry}
         self.param_inputs: Dict[str, TextInput] = {}
 
+        self.add_widget(self._build_filter_bar())
         self.add_widget(self._build_toolbar())
         self.add_widget(self._build_params_panel())
         self.add_widget(self._build_text_panels())
+        self.add_widget(self._build_status_label())
         self.add_widget(self._build_actions())
 
+        self._filter_ciphers()
         self._refresh_params()
+
+    def _build_filter_bar(self) -> BoxLayout:
+        bar = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(42), spacing=dp(8))
+        bar.add_widget(Label(text="Search", size_hint_x=0.2))
+        self.search_input = TextInput(hint_text="Filter ciphers", multiline=False, size_hint_x=0.8)
+        self.search_input.bind(text=lambda *_: self._filter_ciphers())
+        bar.add_widget(self.search_input)
+        return bar
 
     def _build_toolbar(self) -> BoxLayout:
         toolbar = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(48), spacing=dp(8))
@@ -68,19 +79,49 @@ class CipherMobileRoot(BoxLayout):
         panels.add_widget(self.output_text)
         return panels
 
+    def _build_status_label(self) -> Label:
+        self.status_label = Label(text="Ready", size_hint_y=None, height=dp(24), halign="left")
+        return self.status_label
+
     def _build_actions(self) -> BoxLayout:
-        actions = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(48), spacing=dp(8))
+        actions = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(96), spacing=dp(8))
+        left = BoxLayout(orientation="vertical", spacing=dp(6))
+        right = BoxLayout(orientation="vertical", spacing=dp(6))
+
         run_btn = Button(text="Run")
         run_btn.bind(on_release=lambda *_: self._run_cipher())
+        guess_btn = Button(text="Guess")
+        guess_btn.bind(on_release=lambda *_: self._smart_guess())
+        analyze_btn = Button(text="Analyze")
+        analyze_btn.bind(on_release=lambda *_: self._analyze_input())
         swap_btn = Button(text="Swap")
         swap_btn.bind(on_release=lambda *_: self._swap_text())
+        paste_btn = Button(text="Paste")
+        paste_btn.bind(on_release=lambda *_: self._paste_input())
         copy_btn = Button(text="Copy")
         copy_btn.bind(on_release=lambda *_: Clipboard.copy(self.output_text.text))
         clear_btn = Button(text="Clear")
         clear_btn.bind(on_release=lambda *_: self._clear_text())
-        for button in (run_btn, swap_btn, copy_btn, clear_btn):
-            actions.add_widget(button)
+
+        for button in (run_btn, guess_btn, analyze_btn, swap_btn):
+            left.add_widget(button)
+        for button in (paste_btn, copy_btn, clear_btn):
+            right.add_widget(button)
+        actions.add_widget(left)
+        actions.add_widget(right)
         return actions
+
+
+    def _filter_ciphers(self) -> None:
+        query = getattr(self, "search_input", None)
+        needle = query.text.strip().lower() if query else ""
+        names = [entry.name for entry in self.registry if needle in entry.name.lower()]
+        if not names:
+            names = [entry.name for entry in self.registry]
+        self.cipher_spinner.values = names
+        if self.cipher_spinner.text not in names:
+            self.cipher_spinner.text = names[0]
+        self.status_label.text = f"{len(names)} / {len(self.registry)} ciphers" if hasattr(self, "status_label") else ""
 
     def _refresh_params(self) -> None:
         self.params_box.clear_widgets()
@@ -106,16 +147,53 @@ class CipherMobileRoot(BoxLayout):
                 result = encripter.call_decode(self.cipher_spinner.text, self.input_text.text, self._params())
             else:
                 result = encripter.call_encode(self.cipher_spinner.text, self.input_text.text, self._params())
+            self.status_label.text = f"Ran {self.mode_spinner.text} with {self.cipher_spinner.text}"
         except Exception as exc:  # Surface errors in the mobile UI instead of crashing the Activity.
             result = f"Err:{exc}"
+            self.status_label.text = "Error"
         self.output_text.text = result
+
+    def _smart_guess(self) -> None:
+        try:
+            ranked = encripter.SmartGuess(self.input_text.text)[:10]
+            lines = [f"{i+1}. {name} | score={score:.3f}\n{plain}" for i, (name, plain, score) in enumerate(ranked)]
+            self.output_text.text = "\n\n".join(lines) if lines else "No candidates"
+            self.status_label.text = f"SmartGuess: {len(ranked)} candidates shown"
+        except Exception as exc:
+            self.output_text.text = f"Err:{exc}"
+            self.status_label.text = "SmartGuess error"
+
+    def _analyze_input(self) -> None:
+        text = self.input_text.text
+        letters = [ch.upper() for ch in text if ch.isalpha()]
+        counts = sorted(((ch, letters.count(ch)) for ch in set(letters)), key=lambda item: (-item[1], item[0]))
+        try:
+            ioc = encripter.index_of_coincidence(text)
+        except Exception:
+            ioc = 0.0
+        top = ", ".join(f"{ch}:{count}" for ch, count in counts[:10]) or "none"
+        self.output_text.text = (
+            f"Characters: {len(text)}\n"
+            f"Letters: {len(letters)}\n"
+            f"Words: {len(text.split())}\n"
+            f"Index of coincidence: {ioc:.4f}\n"
+            f"Top letters: {top}"
+        )
+        self.status_label.text = "Analysis complete"
+
+    def _paste_input(self) -> None:
+        self.input_text.text = Clipboard.paste()
+        self.status_label.text = "Pasted clipboard to input"
 
     def _swap_text(self) -> None:
         self.input_text.text, self.output_text.text = self.output_text.text, self.input_text.text
+        self.mode_spinner.text = "decode" if self.mode_spinner.text == "encode" else "encode"
+        self.status_label.text = "Swapped input/output and toggled mode"
 
     def _clear_text(self) -> None:
         self.input_text.text = ""
         self.output_text.text = ""
+        self.status_label.text = "Cleared"
 
 
 class AllTheCiphersApp(App):
