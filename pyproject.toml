@@ -17,3 +17,10 @@ classifiers = [
   "Programming Language :: Python :: 3",
   "Operating System :: OS Independent",
 ]
+
+[project.scripts]
+ars-occultandarum-litterarum = "ars_occultandarum_litterarum.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ars_occultandarum_litterarum*"]
