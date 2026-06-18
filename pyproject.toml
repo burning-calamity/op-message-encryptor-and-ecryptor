@@ -5,10 +5,10 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "op-message-encryptor"
 version = "0.1.0"
-description = "A message encryptor and decryptor toolkit with many cipher systems."
+description = "Ars occultandarum litterarum: a message encryptor and decryptor toolkit with many cipher systems."
 readme = "README.md"
 requires-python = ">=3.8"
-license = { text = "MIT" }
+license = "MIT"
 authors = [
   { name = "burning-calamity" }
 ]
@@ -20,8 +20,8 @@ classifiers = [
 ]
 
 [project.scripts]
-all-the-ciphers = "all_the_ciphers.__main__:main"
+ars-occultandarum-litterarum = "ars_occultandarum_litterarum.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["all_the_ciphers*"]
+include = ["ars_occultandarum_litterarum*"]
