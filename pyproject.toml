@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "op-message-encryptor-and-decryptor"
+name = "ars-occultandarum-litterarum"
 version = "0.1.0"
 description = "Ars occultandarum litterarum: a message encryptor and decryptor toolkit with many cipher systems."
 readme = "README.md"
@@ -17,10 +17,3 @@ classifiers = [
   "Programming Language :: Python :: 3",
   "Operating System :: OS Independent",
 ]
-
-[project.scripts]
-ars-occultandarum-litterarum = "ars_occultandarum_litterarum.__main__:main"
-
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["ars_occultandarum_litterarum*"]
