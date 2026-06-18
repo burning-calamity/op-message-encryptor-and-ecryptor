@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "op-message-encryptor"
+name = "op-message-encryptor-and-decryptor"
 version = "0.1.0"
 description = "Ars occultandarum litterarum: a message encryptor and decryptor toolkit with many cipher systems."
 readme = "README.md"
