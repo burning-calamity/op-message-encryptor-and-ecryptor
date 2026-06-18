@@ -345,7 +345,7 @@ Steganography and puzzle helpers
 316. Every-nth-character extractor [ADDED: Every Nth Hider]
 317. Book cipher with source text file [ADDED: Book Cipher]
 318. Coordinate book cipher [ADDED: Dictionary Code]
-319. Page-line-word-letter cipher
+319. Page-line-word-letter cipher [ADDED: Page-Line-Word-Letter]
 320. Word ladder cipher
 321. Dictionary rank cipher [ADDED: Dictionary Code]
 322. Phone keypad/T9 cipher [ADDED: T9 Keypad]

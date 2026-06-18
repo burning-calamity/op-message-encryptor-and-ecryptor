@@ -604,6 +604,59 @@ def DictionaryCode_decode(text: str, dictionary: str = _BOOK_DEFAULT, sep: str =
             out.append(re.search(r"[A-Za-z]", token).group(0).upper())
     return "".join(out)
 
+def _book_pages(book: str) -> List[List[List[str]]]:
+    source = book or _BOOK_DEFAULT
+    pages = []
+    for page in source.split("\f"):
+        lines = []
+        for line in page.splitlines() or [page]:
+            words = re.findall(r"[A-Za-z0-9'-]+", line)
+            if words:
+                lines.append(words)
+        if lines:
+            pages.append(lines)
+    if not pages:
+        pages = [[_book_words(_BOOK_DEFAULT)]]
+    return pages
+
+def PageLineWordLetter_encode(text: str, book: str = _BOOK_DEFAULT, sep: str = ".") -> str:
+    pages = _book_pages(book)
+    index: Dict[str, List[Tuple[int, int, int, int]]] = {}
+    for pi, page in enumerate(pages, 1):
+        for li, line in enumerate(page, 1):
+            for wi, word in enumerate(line, 1):
+                for ci, ch in enumerate(word.upper(), 1):
+                    if ch in ALPHA_SET:
+                        index.setdefault(ch, []).append((pi, li, wi, ci))
+    counters = {ch: 0 for ch in ALPHA}
+    out = []
+    for ch in only_alpha(text):
+        choices = index.get(ch)
+        if not choices:
+            out.append("0" + sep + ch)
+            continue
+        coord = choices[counters[ch] % len(choices)]
+        counters[ch] += 1
+        out.append(sep.join(str(n) for n in coord))
+    return " ".join(out)
+
+def PageLineWordLetter_decode(text: str, book: str = _BOOK_DEFAULT, sep: str = ".") -> str:
+    pages = _book_pages(book)
+    out = []
+    for token in text.split():
+        nums = re.findall(r"\d+", token)
+        if len(nums) >= 4:
+            pi, li, wi, ci = (int(n) for n in nums[:4])
+            try:
+                ch = pages[pi-1][li-1][wi-1][ci-1].upper()
+                if ch in ALPHA_SET:
+                    out.append(ch)
+            except Exception:
+                continue
+        elif token.startswith("0") and re.search(r"[A-Za-z]", token):
+            out.append(re.search(r"[A-Za-z]", token).group(0).upper())
+    return "".join(out)
+
 
 def DellaPortaDisk_encode(text: str, keyword: str = "CIPHER", shift: int | str = 0, keep_others: bool = True) -> str:
     disk = rotate_alpha_from_keyword(keyword)
@@ -8480,6 +8533,7 @@ def get_registry() -> List[CipherEntry]:
         CipherEntry("Codebook Substitution", CodebookSubstitution_encode, CodebookSubstitution_decode, [P("codebook","Codebook","attack=17,dawn=42")]),
         CipherEntry("Book Cipher", BookCipher_encode, BookCipher_decode, [P("book","Book text",_BOOK_DEFAULT), P("sep","Fallback separator","-")]),
         CipherEntry("Dictionary Code", DictionaryCode_encode, DictionaryCode_decode, [P("dictionary","Dictionary text",_BOOK_DEFAULT), P("sep","Index separator",".")]),
+        CipherEntry("Page-Line-Word-Letter", PageLineWordLetter_encode, PageLineWordLetter_decode, [P("book","Book text",_BOOK_DEFAULT), P("sep","Index separator",".")]),
         CipherEntry("Homophonic Substitution", HomophonicSubstitution_encode, HomophonicSubstitution_decode, []),
         CipherEntry("Headline Puzzle", HeadlinePuzzle_encode, HeadlinePuzzle_decode, [P("filler_word","Filler word","headline")]),
         CipherEntry("Della Porta Disk", DellaPortaDisk_encode, DellaPortaDisk_decode, [P("keyword","Disk keyword","CIPHER"), P("shift","Shift","0")]),

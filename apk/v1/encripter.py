@@ -27,6 +27,7 @@ import json
 import math
 import quopri
 import random
+import re
 import string
 import textwrap
 import unicodedata
@@ -528,6 +529,133 @@ def CodebookSubstitution_encode(text: str, codebook: str = "attack=17,dawn=42") 
 def CodebookSubstitution_decode(text: str, codebook: str = "attack=17,dawn=42") -> str:
     table = {v.lower(): k for k, v in _parse_word_map(codebook).items()}
     return " ".join(table.get(word.lower(), word) for word in text.split())
+
+
+_BOOK_DEFAULT = (
+    "alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima "
+    "mike november oscar papa quebec romeo sierra tango uniform victor whiskey "
+    "xray yankee zulu"
+)
+
+def _book_words(book: str) -> List[str]:
+    words = re.findall(r"[A-Za-z][A-Za-z0-9'-]*", book or _BOOK_DEFAULT)
+    return words or re.findall(r"[A-Za-z][A-Za-z0-9'-]*", _BOOK_DEFAULT)
+
+def BookCipher_encode(text: str, book: str = _BOOK_DEFAULT, sep: str = "-") -> str:
+    words = _book_words(book)
+    by_initial: Dict[str, List[int]] = {}
+    for i, word in enumerate(words, 1):
+        by_initial.setdefault(word[0].upper(), []).append(i)
+    counters = {ch: 0 for ch in ALPHA}
+    out = []
+    for ch in only_alpha(text):
+        choices = by_initial.get(ch)
+        if not choices:
+            out.append("0" + sep + ch)
+            continue
+        idx = counters[ch] % len(choices)
+        counters[ch] += 1
+        out.append(str(choices[idx]))
+    return " ".join(out)
+
+def BookCipher_decode(text: str, book: str = _BOOK_DEFAULT, sep: str = "-") -> str:
+    words = _book_words(book)
+    out = []
+    for token in re.findall(r"0\W*[A-Za-z]|\d+", text):
+        if token.startswith("0") and re.search(r"[A-Za-z]", token):
+            out.append(re.search(r"[A-Za-z]", token).group(0).upper())
+            continue
+        n = int(re.search(r"\d+", token).group(0))
+        if 1 <= n <= len(words):
+            out.append(words[n-1][0].upper())
+    return "".join(out)
+
+def DictionaryCode_encode(text: str, dictionary: str = _BOOK_DEFAULT, sep: str = ".") -> str:
+    words = _book_words(dictionary)
+    by_letter: Dict[str, List[Tuple[int, int]]] = {}
+    for wi, word in enumerate(words, 1):
+        for ci, ch in enumerate(word.upper(), 1):
+            if ch in ALPHA_SET:
+                by_letter.setdefault(ch, []).append((wi, ci))
+    counters = {ch: 0 for ch in ALPHA}
+    out = []
+    for ch in only_alpha(text):
+        choices = by_letter.get(ch)
+        if not choices:
+            out.append("0" + sep + ch)
+            continue
+        wi, ci = choices[counters[ch] % len(choices)]
+        counters[ch] += 1
+        out.append(f"{wi}{sep}{ci}")
+    return " ".join(out)
+
+def DictionaryCode_decode(text: str, dictionary: str = _BOOK_DEFAULT, sep: str = ".") -> str:
+    words = _book_words(dictionary)
+    out = []
+    for token in text.split():
+        nums = re.findall(r"\d+", token)
+        if len(nums) >= 2:
+            wi, ci = int(nums[0]), int(nums[1])
+            if 1 <= wi <= len(words) and 1 <= ci <= len(words[wi-1]):
+                ch = words[wi-1][ci-1].upper()
+                if ch in ALPHA_SET:
+                    out.append(ch)
+        elif token.startswith("0") and re.search(r"[A-Za-z]", token):
+            out.append(re.search(r"[A-Za-z]", token).group(0).upper())
+    return "".join(out)
+
+def _book_pages(book: str) -> List[List[List[str]]]:
+    source = book or _BOOK_DEFAULT
+    pages = []
+    for page in source.split("\f"):
+        lines = []
+        for line in page.splitlines() or [page]:
+            words = re.findall(r"[A-Za-z0-9'-]+", line)
+            if words:
+                lines.append(words)
+        if lines:
+            pages.append(lines)
+    if not pages:
+        pages = [[_book_words(_BOOK_DEFAULT)]]
+    return pages
+
+def PageLineWordLetter_encode(text: str, book: str = _BOOK_DEFAULT, sep: str = ".") -> str:
+    pages = _book_pages(book)
+    index: Dict[str, List[Tuple[int, int, int, int]]] = {}
+    for pi, page in enumerate(pages, 1):
+        for li, line in enumerate(page, 1):
+            for wi, word in enumerate(line, 1):
+                for ci, ch in enumerate(word.upper(), 1):
+                    if ch in ALPHA_SET:
+                        index.setdefault(ch, []).append((pi, li, wi, ci))
+    counters = {ch: 0 for ch in ALPHA}
+    out = []
+    for ch in only_alpha(text):
+        choices = index.get(ch)
+        if not choices:
+            out.append("0" + sep + ch)
+            continue
+        coord = choices[counters[ch] % len(choices)]
+        counters[ch] += 1
+        out.append(sep.join(str(n) for n in coord))
+    return " ".join(out)
+
+def PageLineWordLetter_decode(text: str, book: str = _BOOK_DEFAULT, sep: str = ".") -> str:
+    pages = _book_pages(book)
+    out = []
+    for token in text.split():
+        nums = re.findall(r"\d+", token)
+        if len(nums) >= 4:
+            pi, li, wi, ci = (int(n) for n in nums[:4])
+            try:
+                ch = pages[pi-1][li-1][wi-1][ci-1].upper()
+                if ch in ALPHA_SET:
+                    out.append(ch)
+            except Exception:
+                continue
+        elif token.startswith("0") and re.search(r"[A-Za-z]", token):
+            out.append(re.search(r"[A-Za-z]", token).group(0).upper())
+    return "".join(out)
 
 
 def DellaPortaDisk_encode(text: str, keyword: str = "CIPHER", shift: int | str = 0, keep_others: bool = True) -> str:
@@ -1370,6 +1498,1724 @@ def SpiralOutwardRoute_decode(text: str, rows: int | str = 5, cols: int | str = 
         out.extend("".join(row) for row in grid)
     return "".join(out).rstrip((pad or "X")[0])
 
+
+
+def _amsco_cell_lengths(length: int, cols: int, start_len: int) -> List[List[int]]:
+    rows = []
+    used = 0
+    toggle = 0 if int(start_len) == 1 else 1
+    while used < length:
+        row = []
+        for _ in range(cols):
+            want = 1 if toggle % 2 == 0 else 2
+            take = min(want, max(0, length - used))
+            row.append(take)
+            used += take
+            toggle += 1
+            if used >= length:
+                row.extend([0] * (cols - len(row)))
+                break
+        rows.append(row)
+    return rows or [[0] * cols]
+
+
+def AMSCO_encode(text: str, key: str = "CIPHER", start_len: int | str = 1) -> str:
+    s = "".join(ch for ch in text if not ch.isspace())
+    cols = len(key) or 1
+    lengths = _amsco_cell_lengths(len(s), cols, int(start_len))
+    cells = [[""] * cols for _ in lengths]
+    idx = 0
+    for r, row in enumerate(lengths):
+        for c, n in enumerate(row):
+            cells[r][c] = s[idx:idx+n]
+            idx += n
+    out = []
+    for c in _stable_column_order(key):
+        for r in range(len(cells)):
+            out.append(cells[r][c])
+    return "".join(out)
+
+
+def AMSCO_decode(text: str, key: str = "CIPHER", start_len: int | str = 1) -> str:
+    s = text
+    cols = len(key) or 1
+    lengths = _amsco_cell_lengths(len(s), cols, int(start_len))
+    cells = [[""] * cols for _ in lengths]
+    idx = 0
+    for c in _stable_column_order(key):
+        for r, row in enumerate(lengths):
+            n = row[c]
+            cells[r][c] = s[idx:idx+n]
+            idx += n
+    out = []
+    for r in range(len(cells)):
+        for c in range(cols):
+            out.append(cells[r][c])
+    return "".join(out)
+
+
+def _reverse_blocks_by_digits(text: str, digits: str) -> str:
+    sizes = [max(1, int(ch)) for ch in str(digits) if ch.isdigit() and ch != "0"] or [5]
+    out = []
+    idx = 0
+    block_no = 0
+    while idx < len(text):
+        size = sizes[block_no % len(sizes)]
+        out.append(text[idx:idx+size][::-1])
+        idx += size
+        block_no += 1
+    return "".join(out)
+
+
+def Bazeries_encode(text: str, number: str = "31415", key: str = "BAZERIES", keep_others: bool = True) -> str:
+    alpha = rotate_alpha_from_keyword(key)
+    subbed = apply_monoalpha(text, ALPHA, alpha, keep_others)
+    return _reverse_blocks_by_digits(subbed, number)
+
+
+def Bazeries_decode(text: str, number: str = "31415", key: str = "BAZERIES", keep_others: bool = True) -> str:
+    alpha = rotate_alpha_from_keyword(key)
+    unblocked = _reverse_blocks_by_digits(text, number)
+    return apply_monoalpha(unblocked, alpha, ALPHA, keep_others)
+
+
+def DisruptedTransposition_encode(text: str, key: str = "DISRUPT", pad: str = "X") -> str:
+    cols = len(key) or 1
+    padch = (pad or "X")[0]
+    s = "".join(ch for ch in text if not ch.isspace())
+    if len(s) % cols:
+        s += padch * (cols - len(s) % cols)
+    rows = len(s) // cols
+    grid = []
+    idx = 0
+    for r in range(rows):
+        row = list(s[idx:idx+cols])
+        idx += cols
+        shift = r % cols
+        grid.append(row[shift:] + row[:shift])
+    out = []
+    for c in _stable_column_order(key):
+        for r in range(rows):
+            out.append(grid[r][c])
+    return "".join(out)
+
+
+def DisruptedTransposition_decode(text: str, key: str = "DISRUPT", pad: str = "X") -> str:
+    cols = len(key) or 1
+    if len(text) % cols:
+        return "Err:ciphertext length must be a multiple of key length"
+    rows = len(text) // cols
+    grid = [[""] * cols for _ in range(rows)]
+    idx = 0
+    for c in _stable_column_order(key):
+        for r in range(rows):
+            grid[r][c] = text[idx]
+            idx += 1
+    out = []
+    for r, row in enumerate(grid):
+        shift = r % cols
+        plain_row = row[-shift:] + row[:-shift] if shift else row
+        out.extend(plain_row)
+    return "".join(out).rstrip((pad or "X")[0])
+
+
+def IncompleteColumnar_encode(text: str, key: str = "CIPHER", keep_spaces: str = "false") -> str:
+    keep = str(keep_spaces).lower() in {"1", "true", "yes", "on"}
+    s = text if keep else "".join(ch for ch in text if not ch.isspace())
+    cols = len(key) or 1
+    rows = math.ceil(len(s) / cols)
+    grid = [[""] * cols for _ in range(rows)]
+    idx = 0
+    for r in range(rows):
+        for c in range(cols):
+            if idx < len(s):
+                grid[r][c] = s[idx]
+                idx += 1
+    out = []
+    for c in _stable_column_order(key):
+        for r in range(rows):
+            if grid[r][c]:
+                out.append(grid[r][c])
+    return "".join(out)
+
+
+def IncompleteColumnar_decode(text: str, key: str = "CIPHER", keep_spaces: str = "false") -> str:
+    s = text
+    cols = len(key) or 1
+    rows = math.ceil(len(s) / cols)
+    extra = len(s) % cols
+    counts = {c: rows for c in range(cols)}
+    if extra:
+        for c in range(extra, cols):
+            counts[c] = rows - 1
+    grid = [[""] * cols for _ in range(rows)]
+    idx = 0
+    for c in _stable_column_order(key):
+        for r in range(counts[c]):
+            grid[r][c] = s[idx]
+            idx += 1
+    return "".join(grid[r][c] for r in range(rows) for c in range(cols) if grid[r][c])
+
+
+def ScytalePadded_encode(text: str, diameter: int | str = 5, pad: str = "X") -> str:
+    diameter = max(1, int(diameter))
+    padch = (pad or "X")[0]
+    s = text
+    if len(s) % diameter:
+        s += padch * (diameter - len(s) % diameter)
+    return Scytale_encode(s, diameter)
+
+
+def ScytalePadded_decode(text: str, diameter: int | str = 5, pad: str = "X") -> str:
+    return Scytale_decode(text, diameter).rstrip((pad or "X")[0])
+
+
+# Additional polygraphic/classical roadmap ciphers
+
+def _playfair_prepare_6(text: str) -> List[Tuple[str, str]]:
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    s = "".join(ch for ch in to_upper(text) if ch in alphabet)
+    pairs = []
+    i = 0
+    while i < len(s):
+        a = s[i]
+        if i + 1 < len(s):
+            b = s[i + 1]
+            if a == b:
+                pairs.append((a, "X" if a != "X" else "Q"))
+                i += 1
+            else:
+                pairs.append((a, b))
+                i += 2
+        else:
+            pairs.append((a, "X" if a != "X" else "Q"))
+            i += 1
+    return pairs
+
+
+def Playfair6x6_encode(text: str, key: str = "KEYWORD") -> str:
+    _, pos, rev = _key_square_6(key)
+    out = []
+    for a, b in _playfair_prepare_6(text):
+        ra, ca = pos[a]
+        rb, cb = pos[b]
+        if ra == rb:
+            out.append(rev[(ra, (ca + 1) % 6)])
+            out.append(rev[(rb, (cb + 1) % 6)])
+        elif ca == cb:
+            out.append(rev[((ra + 1) % 6, ca)])
+            out.append(rev[((rb + 1) % 6, cb)])
+        else:
+            out.append(rev[(ra, cb)])
+            out.append(rev[(rb, ca)])
+    return "".join(out).lower()
+
+
+def Playfair6x6_decode(text: str, key: str = "KEYWORD") -> str:
+    _, pos, rev = _key_square_6(key)
+    s = "".join(ch for ch in to_upper(text) if ch in pos)
+    if len(s) % 2:
+        s += "X"
+    out = []
+    for i in range(0, len(s), 2):
+        a, b = s[i], s[i + 1]
+        ra, ca = pos[a]
+        rb, cb = pos[b]
+        if ra == rb:
+            out.append(rev[(ra, (ca - 1) % 6)])
+            out.append(rev[(rb, (cb - 1) % 6)])
+        elif ca == cb:
+            out.append(rev[((ra - 1) % 6, ca)])
+            out.append(rev[((rb - 1) % 6, cb)])
+        else:
+            out.append(rev[(ra, cb)])
+            out.append(rev[(rb, ca)])
+    return "".join(out).lower()
+
+
+def FourSquare6x6_encode(text: str, key1: str = "EXAMPLE", key2: str = "KEYWORD") -> str:
+    normal = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    _, _, rev1 = _key_square_6(key1)
+    _, _, rev2 = _key_square_6(key2)
+    posN = {ch: divmod(i, 6) for i, ch in enumerate(normal)}
+    out = []
+    for a, b in _playfair_prepare_6(text):
+        ra, ca = posN[a]
+        rb, cb = posN[b]
+        out.append(rev1[(ra, cb)])
+        out.append(rev2[(rb, ca)])
+    return "".join(out).lower()
+
+
+def FourSquare6x6_decode(text: str, key1: str = "EXAMPLE", key2: str = "KEYWORD") -> str:
+    normal = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    _, pos1, _ = _key_square_6(key1)
+    _, pos2, _ = _key_square_6(key2)
+    revN = {divmod(i, 6): ch for i, ch in enumerate(normal)}
+    valid = set(pos1) & set(pos2)
+    s = "".join(ch for ch in to_upper(text) if ch in valid)
+    if len(s) % 2:
+        s += "X"
+    out = []
+    for i in range(0, len(s), 2):
+        a, b = s[i], s[i + 1]
+        ra, cb = pos1[a]
+        rb, ca = pos2[b]
+        out.append(revN[(ra, ca)])
+        out.append(revN[(rb, cb)])
+    return "".join(out).lower()
+
+
+def TwoSquare6x6_encode(text: str, key1: str = "EXAMPLE", key2: str = "KEYWORD") -> str:
+    _, posL, revL = _key_square_6(key1)
+    _, posR, revR = _key_square_6(key2)
+    out = []
+    for a, b in _playfair_prepare_6(text):
+        ra, ca = posL[a]
+        rb, cb = posR[b]
+        out.append(revR[(ra, cb)])
+        out.append(revL[(rb, ca)])
+    return "".join(out).lower()
+
+
+def TwoSquare6x6_decode(text: str, key1: str = "EXAMPLE", key2: str = "KEYWORD") -> str:
+    _, posL, revL = _key_square_6(key1)
+    _, posR, revR = _key_square_6(key2)
+    valid = set(posL) & set(posR)
+    s = "".join(ch for ch in to_upper(text) if ch in valid)
+    if len(s) % 2:
+        s += "X"
+    out = []
+    for i in range(0, len(s), 2):
+        a, b = s[i], s[i + 1]
+        ra, cb = posR[a]
+        rb, ca = posL[b]
+        out.append(revL[(ra, ca)])
+        out.append(revR[(rb, cb)])
+    return "".join(out).lower()
+
+
+def Bifid6x6_encode(text: str, key: str = "KEYWORD", period: int | str = 5) -> str:
+    period = max(1, int(period))
+    _, pos, rev = _key_square_6(key)
+    s = "".join(ch for ch in to_upper(text) if ch in pos)
+    out = []
+    for block in chunk(s, period):
+        rows = []
+        cols = []
+        for ch in block:
+            r, c = pos[ch]
+            rows.append(r)
+            cols.append(c)
+        merged = rows + cols
+        for i in range(0, len(merged), 2):
+            out.append(rev[(merged[i], merged[i + 1])])
+    return "".join(out).lower()
+
+
+def Bifid6x6_decode(text: str, key: str = "KEYWORD", period: int | str = 5) -> str:
+    period = max(1, int(period))
+    _, pos, rev = _key_square_6(key)
+    s = "".join(ch for ch in to_upper(text) if ch in pos)
+    out = []
+    for block in chunk(s, period):
+        flat = []
+        for ch in block:
+            flat.extend(pos[ch])
+        n = len(block)
+        rows = flat[:n]
+        cols = flat[n:]
+        for r, c in zip(rows, cols):
+            out.append(rev[(r, c)])
+    return "".join(out).lower()
+
+
+def _gromark_digits(primer: str, length: int) -> List[int]:
+    digits = [int(ch) for ch in str(primer) if ch.isdigit()] or [1, 2, 3, 4, 5]
+    i = 0
+    while len(digits) < length:
+        digits.append((digits[i] + digits[i + 1]) % 10)
+        i += 1
+    return digits[:length]
+
+
+def Gromark_encode(text: str, primer: str = "12345", key: str = "GROMARK") -> str:
+    cipher_alpha = rotate_alpha_from_keyword(key)
+    shifts = _gromark_digits(primer, len(only_alpha(text)))
+    out = []
+    idx = 0
+    for ch in text:
+        up = ch.upper()
+        if up in ALPHA_SET:
+            val = (ALPHA.index(up) + shifts[idx]) % 26
+            out.append(cipher_alpha[val] if ch.isupper() else cipher_alpha[val].lower())
+            idx += 1
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+def Gromark_decode(text: str, primer: str = "12345", key: str = "GROMARK") -> str:
+    cipher_alpha = rotate_alpha_from_keyword(key)
+    shifts = _gromark_digits(primer, len(only_alpha(text)))
+    out = []
+    idx = 0
+    for ch in text:
+        up = ch.upper()
+        if up in cipher_alpha:
+            val = (cipher_alpha.index(up) - shifts[idx]) % 26
+            out.append(ALPHA[val] if ch.isupper() else ALPHA[val].lower())
+            idx += 1
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+def NihilistSubstitution_encode(text: str, square_key: str = "NIHILIST", key: str = "KEY") -> str:
+    _, pos, _ = _key_square_5(square_key)
+    key_nums = []
+    for ch in only_alpha(key):
+        ch = "I" if ch == "J" else ch
+        if ch in pos:
+            r, c = pos[ch]
+            key_nums.append((r + 1) * 10 + c + 1)
+    key_nums = key_nums or [11]
+    out = []
+    idx = 0
+    for ch in to_upper(text):
+        ch = "I" if ch == "J" else ch
+        if ch in pos:
+            r, c = pos[ch]
+            out.append(str((r + 1) * 10 + c + 1 + key_nums[idx % len(key_nums)]))
+            idx += 1
+    return " ".join(out)
+
+
+def NihilistSubstitution_decode(text: str, square_key: str = "NIHILIST", key: str = "KEY") -> str:
+    _, pos, rev = _key_square_5(square_key)
+    key_nums = []
+    for ch in only_alpha(key):
+        ch = "I" if ch == "J" else ch
+        if ch in pos:
+            r, c = pos[ch]
+            key_nums.append((r + 1) * 10 + c + 1)
+    key_nums = key_nums or [11]
+    nums = [int(x) for x in re.findall(r"\d+", text)]
+    out = []
+    for i, n in enumerate(nums):
+        val = n - key_nums[i % len(key_nums)]
+        r, c = divmod(val, 10)
+        out.append(rev.get((r - 1, c - 1), ""))
+    return "".join(out).lower()
+
+
+def _parse_hill3_key(key: str) -> List[List[int]]:
+    parts = [p.strip() for p in str(key).replace(";", ",").replace(" ", ",").split(",") if p.strip()]
+    if len(parts) == 9:
+        nums = [int(p) % 26 for p in parts]
+    else:
+        letters = only_alpha(str(key))
+        if len(letters) < 9:
+            raise ValueError("Hill 3x3 key must be nine numbers or at least nine letters")
+        nums = [ALPHA.index(ch) for ch in letters[:9]]
+    mat = [nums[0:3], nums[3:6], nums[6:9]]
+    det = _det3(mat) % 26
+    mod_inv(det, 26)
+    return mat
+
+
+def _det3(m: List[List[int]]) -> int:
+    return (
+        m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+        - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+        + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0])
+    )
+
+
+def _inv3_mod26(m: List[List[int]]) -> List[List[int]]:
+    det = _det3(m) % 26
+    inv_det = mod_inv(det, 26)
+    cof = [
+        [m[1][1]*m[2][2] - m[1][2]*m[2][1], -(m[1][0]*m[2][2] - m[1][2]*m[2][0]), m[1][0]*m[2][1] - m[1][1]*m[2][0]],
+        [-(m[0][1]*m[2][2] - m[0][2]*m[2][1]), m[0][0]*m[2][2] - m[0][2]*m[2][0], -(m[0][0]*m[2][1] - m[0][1]*m[2][0])],
+        [m[0][1]*m[1][2] - m[0][2]*m[1][1], -(m[0][0]*m[1][2] - m[0][2]*m[1][0]), m[0][0]*m[1][1] - m[0][1]*m[1][0]],
+    ]
+    adj = [[cof[c][r] for c in range(3)] for r in range(3)]
+    return [[(adj[r][c] * inv_det) % 26 for c in range(3)] for r in range(3)]
+
+
+def _hill3_apply(text: str, mat: List[List[int]]) -> str:
+    s = only_alpha(text)
+    while len(s) % 3:
+        s += "X"
+    out = []
+    for block in chunk(s, 3):
+        vec = [ALPHA.index(ch) for ch in block]
+        for row in mat:
+            out.append(ALPHA[sum(row[i] * vec[i] for i in range(3)) % 26])
+    return "".join(out).lower()
+
+
+def Hill3x3_encode(text: str, key: str = "6,24,1,13,16,10,20,17,15") -> str:
+    return _hill3_apply(text, _parse_hill3_key(key))
+
+
+def Hill3x3_decode(text: str, key: str = "6,24,1,13,16,10,20,17,15") -> str:
+    return _hill3_apply(text, _inv3_mod26(_parse_hill3_key(key)))
+
+
+def _labels_unique(labels: str, size: int) -> str:
+    lab = "".join(ch for ch in str(labels) if not ch.isspace())
+    if len(lab) != size or len(set(lab)) != size:
+        raise ValueError(f"labels must contain {size} unique non-space characters")
+    return lab
+
+
+def PolybiusCustom_encode(text: str, key: str = "KEYWORD", row_labels: str = "12345", col_labels: str = "12345", sep: str = " ") -> str:
+    rows = _labels_unique(row_labels, 5)
+    cols = _labels_unique(col_labels, 5)
+    _, pos, _ = _key_square_5(key)
+    out = []
+    for ch in to_upper(text):
+        if ch == "J":
+            ch = "I"
+        if ch in pos:
+            r, c = pos[ch]
+            out.append(rows[r] + cols[c])
+        elif ch.isspace():
+            out.append("/")
+    return sep.join(out)
+
+
+def PolybiusCustom_decode(text: str, key: str = "KEYWORD", row_labels: str = "12345", col_labels: str = "12345", sep: str = " ") -> str:
+    rows = _labels_unique(row_labels, 5)
+    cols = _labels_unique(col_labels, 5)
+    _, _, rev = _key_square_5(key)
+    raw = text.strip()
+    tokens = raw.split(sep) if sep else [raw[i:i+2] for i in range(0, len(raw), 2)]
+    out = []
+    for tok in tokens:
+        tok = tok.strip()
+        if tok == "/":
+            out.append(" ")
+        elif len(tok) == 2 and tok[0] in rows and tok[1] in cols:
+            out.append(rev.get((rows.index(tok[0]), cols.index(tok[1])), ""))
+    return "".join(out).lower()
+
+
+def ADFGXCustom_encode(text: str, square_key: str = "KEYWORD", route_key: str = "CIPHER", labels: str = "ADFGX") -> str:
+    lab = _labels_unique(labels, 5)
+    _, pos, _ = _key_square_5(square_key)
+    frac = []
+    for ch in to_upper(text):
+        if ch == "J":
+            ch = "I"
+        if ch in pos:
+            r, c = pos[ch]
+            frac.append(lab[r] + lab[c])
+    return _columnar_route("".join(frac), route_key)
+
+
+def ADFGXCustom_decode(text: str, square_key: str = "KEYWORD", route_key: str = "CIPHER", labels: str = "ADFGX") -> str:
+    lab = _labels_unique(labels, 5)
+    _, _, rev = _key_square_5(square_key)
+    frac = _columnar_unroute(text, route_key)
+    out = []
+    for a, b in _pairwise(frac):
+        if a in lab and b in lab:
+            out.append(rev.get((lab.index(a), lab.index(b)), ""))
+    return "".join(out).lower()
+
+
+def _matrix_minor(mat: List[List[int]], skip_r: int, skip_c: int) -> List[List[int]]:
+    return [[v for c, v in enumerate(row) if c != skip_c] for r, row in enumerate(mat) if r != skip_r]
+
+
+def _det_matrix(mat: List[List[int]]) -> int:
+    if len(mat) == 1:
+        return mat[0][0]
+    if len(mat) == 2:
+        return mat[0][0] * mat[1][1] - mat[0][1] * mat[1][0]
+    return sum(((-1) ** c) * mat[0][c] * _det_matrix(_matrix_minor(mat, 0, c)) for c in range(len(mat)))
+
+
+def _parse_hilln_key(key: str, size: int, modulus: int) -> List[List[int]]:
+    size = max(2, int(size))
+    modulus = max(2, int(modulus))
+    need = size * size
+    parts = [p.strip() for p in str(key).replace(";", ",").replace(" ", ",").split(",") if p.strip()]
+    if len(parts) == need:
+        nums = [int(p) % modulus for p in parts]
+    else:
+        letters = only_alpha(str(key))
+        if len(letters) < need:
+            raise ValueError(f"Hill {size}x{size} key must be {need} numbers or at least {need} letters")
+        nums = [ALPHA.index(ch) % modulus for ch in letters[:need]]
+    mat = [nums[i:i+size] for i in range(0, need, size)]
+    mod_inv(_det_matrix(mat) % modulus, modulus)
+    return mat
+
+
+def _invert_matrix_mod(mat: List[List[int]], modulus: int) -> List[List[int]]:
+    n = len(mat)
+    det = _det_matrix(mat) % modulus
+    inv_det = mod_inv(det, modulus)
+    cof = []
+    for r in range(n):
+        row = []
+        for c in range(n):
+            row.append(((-1) ** (r + c)) * _det_matrix(_matrix_minor(mat, r, c)))
+        cof.append(row)
+    adj = [[cof[c][r] for c in range(n)] for r in range(n)]
+    return [[(adj[r][c] * inv_det) % modulus for c in range(n)] for r in range(n)]
+
+
+def _hilln_apply(text: str, mat: List[List[int]], alphabet: str) -> str:
+    n = len(mat)
+    pos = {ch: i for i, ch in enumerate(alphabet)}
+    s = "".join(ch for ch in to_upper(text) if ch in pos)
+    pad = alphabet[23 % len(alphabet)] if alphabet else "X"
+    while len(s) % n:
+        s += pad
+    out = []
+    for block in chunk(s, n):
+        vec = [pos[ch] for ch in block]
+        for row in mat:
+            out.append(alphabet[sum(row[i] * vec[i] for i in range(n)) % len(alphabet)])
+    return "".join(out).lower()
+
+
+def HillNxN_encode(text: str, key: str = "6,24,1,13,16,10,20,17,15", size: int | str = 3, alphabet: str = ALPHA) -> str:
+    alpha = "".join(dict.fromkeys(to_upper(alphabet))) or ALPHA
+    mat = _parse_hilln_key(key, int(size), len(alpha))
+    return _hilln_apply(text, mat, alpha)
+
+
+def HillNxN_decode(text: str, key: str = "6,24,1,13,16,10,20,17,15", size: int | str = 3, alphabet: str = ALPHA) -> str:
+    alpha = "".join(dict.fromkeys(to_upper(alphabet))) or ALPHA
+    mat = _parse_hilln_key(key, int(size), len(alpha))
+    return _hilln_apply(text, _invert_matrix_mod(mat, len(alpha)), alpha)
+
+
+def _trifid_custom_tables(alphabet: str) -> Tuple[Dict[str, Tuple[int, int, int]], Dict[Tuple[int, int, int], str]]:
+    alpha = "".join(dict.fromkeys(to_upper(alphabet)))
+    if len(alpha) != 27:
+        raise ValueError("alphabet must contain exactly 27 unique symbols")
+    pos = {}
+    rev = {}
+    for i, ch in enumerate(alpha):
+        layer = i // 9
+        row, col = divmod(i % 9, 3)
+        pos[ch] = (layer, row, col)
+        rev[(layer, row, col)] = ch
+    return pos, rev
+
+
+def TrifidCustom_encode(text: str, alphabet: str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ.", period: int | str = 5) -> str:
+    period = max(1, int(period))
+    pos, rev = _trifid_custom_tables(alphabet)
+    s = "".join(ch for ch in to_upper(text) if ch in pos)
+    out = []
+    for block in chunk(s, period):
+        coords = [[], [], []]
+        for ch in block:
+            a, b, c = pos[ch]
+            coords[0].append(a); coords[1].append(b); coords[2].append(c)
+        merged = coords[0] + coords[1] + coords[2]
+        for i in range(0, len(merged), 3):
+            out.append(rev[(merged[i], merged[i + 1], merged[i + 2])])
+    return "".join(out).lower()
+
+
+def TrifidCustom_decode(text: str, alphabet: str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ.", period: int | str = 5) -> str:
+    period = max(1, int(period))
+    pos, rev = _trifid_custom_tables(alphabet)
+    s = "".join(ch for ch in to_upper(text) if ch in pos)
+    out = []
+    for block in chunk(s, period):
+        flat = []
+        for ch in block:
+            flat.extend(pos[ch])
+        n = len(block)
+        for coords in zip(flat[:n], flat[n:2*n], flat[2*n:]):
+            out.append(rev[coords])
+    return "".join(out).lower()
+
+
+def _complete_route_with_len(frac: str, key: str, pad: str) -> Tuple[str, int]:
+    cols = max(1, len(key))
+    rows = math.ceil(len(frac) / cols)
+    original_len = len(frac)
+    padded = frac + pad * (rows * cols - len(frac))
+    grid = [list(padded[i:i+cols]) for i in range(0, len(padded), cols)]
+    out = []
+    for c in _stable_column_order(key):
+        for r in range(rows):
+            out.append(grid[r][c])
+    return "".join(out), original_len
+
+
+def _complete_unroute_with_len(cipher: str, key: str, original_len: int) -> str:
+    cols = max(1, len(key))
+    rows = math.ceil(len(cipher) / cols)
+    grid = [[""] * cols for _ in range(rows)]
+    idx = 0
+    for c in _stable_column_order(key):
+        for r in range(rows):
+            if idx < len(cipher):
+                grid[r][c] = cipher[idx]
+                idx += 1
+    return "".join(grid[r][c] for r in range(rows) for c in range(cols))[:original_len]
+
+
+def ADFGVXEscaped_encode(text: str, square_key: str = "KEYW0RD", route_key: str = "CIPHER") -> str:
+    labels = "ADFGVX"
+    _, pos, _ = _key_square_6(square_key)
+    hex_text = text.encode("utf-8").hex().upper()
+    frac = []
+    for ch in hex_text:
+        r, c = pos[ch]
+        frac.append(labels[r] + labels[c])
+    routed, original_len = _complete_route_with_len("".join(frac), route_key, labels[0])
+    return f"[ADFGVXESC]{original_len}|{routed}"
+
+
+def ADFGVXEscaped_decode(text: str, square_key: str = "KEYW0RD", route_key: str = "CIPHER") -> str:
+    labels = "ADFGVX"
+    _, _, rev = _key_square_6(square_key)
+    body = text
+    original_len = len(body)
+    if text.startswith("[ADFGVXESC]") and "|" in text:
+        meta, body = text.split("|", 1)
+        original_len = int(meta[len("[ADFGVXESC]"):])
+    frac = _complete_unroute_with_len(body, route_key, original_len)
+    hex_chars = []
+    for a, b in _pairwise(frac):
+        if a in labels and b in labels:
+            hex_chars.append(rev.get((labels.index(a), labels.index(b)), ""))
+    hex_text = "".join(hex_chars)
+    if len(hex_text) % 2:
+        hex_text = hex_text[:-1]
+    try:
+        return bytes.fromhex(hex_text).decode("utf-8")
+    except Exception as exc:
+        return f"Err:{exc}"
+
+
+def _key_square_5_q(keyword: str) -> Tuple[str, Dict[str, Tuple[int, int]], Dict[Tuple[int, int], str]]:
+    alpha = "ABCDEFGHIJKLMNOPRSTUVWXYZ"  # Q omitted, I/J kept separate
+    mixed = ""; seen = set()
+    for ch in only_alpha(keyword):
+        if ch == "Q":
+            continue
+        if ch not in seen and ch in alpha:
+            mixed += ch; seen.add(ch)
+    for ch in alpha:
+        if ch not in seen:
+            mixed += ch
+    idx = {}; rev = {}
+    for i, ch in enumerate(mixed):
+        r, c = divmod(i, 5)
+        idx[ch] = (r, c); rev[(r, c)] = ch
+    return mixed, idx, rev
+
+
+def _playfair_prepare_variant(text: str, omit: str = "J", filler: str = "X") -> List[Tuple[str, str]]:
+    omit = (omit or "J").upper()[0]
+    filler = (filler or "X").upper()[0]
+    s = only_alpha(text)
+    if omit == "J":
+        s = s.replace("J", "I")
+    elif omit == "Q":
+        s = s.replace("Q", "K")
+    pairs = []
+    i = 0
+    while i < len(s):
+        a = s[i]
+        if i + 1 < len(s):
+            b = s[i + 1]
+            if a == b:
+                pairs.append((a, filler if a != filler else "Z"))
+                i += 1
+            else:
+                pairs.append((a, b))
+                i += 2
+        else:
+            pairs.append((a, filler if a != filler else "Z"))
+            i += 1
+    return pairs
+
+
+def _playfair_core_from_square(text: str, key: str, encode: bool, omit: str = "J", filler: str = "X") -> str:
+    _, pos, rev = _key_square_5_q(key) if omit.upper().startswith("Q") else _key_square_5(key)
+    pairs = _playfair_prepare_variant(text, omit, filler) if encode else chunk(only_alpha(text), 2)
+    out = []
+    for pair in pairs:
+        if len(pair) != 2:
+            continue
+        a, b = pair
+        if a not in pos or b not in pos:
+            continue
+        ra, ca = pos[a]; rb, cb = pos[b]
+        step = 1 if encode else -1
+        if ra == rb:
+            out.append(rev[(ra, (ca + step) % 5)])
+            out.append(rev[(rb, (cb + step) % 5)])
+        elif ca == cb:
+            out.append(rev[((ra + step) % 5, ca)])
+            out.append(rev[((rb + step) % 5, cb)])
+        else:
+            out.append(rev[(ra, cb)])
+            out.append(rev[(rb, ca)])
+    return "".join(out).lower()
+
+
+def PlayfairQOmitted_encode(text: str, key: str = "KEYWORD", filler: str = "X") -> str:
+    return _playfair_core_from_square(text, key, True, "Q", filler)
+
+
+def PlayfairQOmitted_decode(text: str, key: str = "KEYWORD", filler: str = "X") -> str:
+    return _playfair_core_from_square(text, key, False, "Q", filler)
+
+
+
+
+def _playfair_unpad_text(s: str, filler: str = "X") -> str:
+    filler = (filler or "X").upper()[0]
+    chars = list(s)
+    out = []
+    i = 0
+    while i < len(chars):
+        if i + 2 < len(chars) and chars[i] == chars[i + 2] and chars[i + 1] == filler:
+            out.append(chars[i])
+            i += 2
+        else:
+            out.append(chars[i])
+            i += 1
+    if out and out[-1] == filler:
+        out.pop()
+    return "".join(out)
+
+def PlayfairPreserve_encode(text: str, key: str = "KEYWORD", filler: str = "X") -> str:
+    letters = Playfair_encode(text, key).upper()
+    it = iter(letters)
+    out = []
+    for ch in text:
+        if ch.upper() in ALPHA_SET:
+            try:
+                mapped = next(it)
+            except StopIteration:
+                break
+            out.append(mapped if ch.isupper() else mapped.lower())
+        else:
+            out.append(ch)
+    out.extend(it)
+    return "".join(out)
+
+
+def PlayfairPreserve_decode(text: str, key: str = "KEYWORD", filler: str = "X") -> str:
+    letters = _playfair_unpad_text(Playfair_decode(text, key).upper(), filler)
+    it = iter(letters)
+    out = []
+    for ch in text:
+        if ch.upper() in ALPHA_SET:
+            try:
+                mapped = next(it)
+            except StopIteration:
+                break
+            out.append(mapped if ch.isupper() else mapped.lower())
+        else:
+            out.append(ch)
+    out.extend(it)
+    return "".join(out)
+
+
+def PlayfairPadding_encode(text: str, key: str = "KEYWORD", filler: str = "X", omit: str = "J") -> str:
+    return _playfair_core_from_square(text, key, True, omit, filler)
+
+
+def PlayfairPadding_decode(text: str, key: str = "KEYWORD", filler: str = "X", omit: str = "J") -> str:
+    return _playfair_core_from_square(text, key, False, omit, filler)
+
+
+def DoublePlayfair_encode(text: str, key1: str = "ALPHA", key2: str = "OMEGA") -> str:
+    return Playfair_encode(Playfair_encode(text, key1), key2)
+
+
+def DoublePlayfair_decode(text: str, key1: str = "ALPHA", key2: str = "OMEGA") -> str:
+    return Playfair_decode(Playfair_decode(text, key2), key1)
+
+
+def PolybiusColumnar_encode(text: str, square_key: str = "KEYWORD", route_key: str = "CIPHER", row_labels: str = "12345", col_labels: str = "12345") -> str:
+    frac = PolybiusCustom_encode(text, square_key, row_labels, col_labels, sep="")
+    routed, original_len = _complete_route_with_len(frac, route_key, row_labels[0] if row_labels else "1")
+    return f"[POLYCOL]{original_len}|{routed}"
+
+
+def PolybiusColumnar_decode(text: str, square_key: str = "KEYWORD", route_key: str = "CIPHER", row_labels: str = "12345", col_labels: str = "12345") -> str:
+    body = text
+    original_len = len(body)
+    if text.startswith("[POLYCOL]") and "|" in text:
+        meta, body = text.split("|", 1)
+        original_len = int(meta[len("[POLYCOL]"):])
+    frac = _complete_unroute_with_len(body, route_key, original_len)
+    return PolybiusCustom_decode(frac, square_key, row_labels, col_labels, sep="")
+
+
+def DoubleColumnarIrregular_encode(text: str, key1: str = "ALPHA", key2: str = "OMEGA") -> str:
+    first = IncompleteColumnar_encode(text, key1, "false")
+    return IncompleteColumnar_encode(first, key2, "false")
+
+
+def DoubleColumnarIrregular_decode(text: str, key1: str = "ALPHA", key2: str = "OMEGA") -> str:
+    first = IncompleteColumnar_decode(text, key2, "false")
+    return IncompleteColumnar_decode(first, key1, "false")
+
+
+def TwinBifid_encode(text: str, key1: str = "ALPHA", key2: str = "OMEGA", period: int | str = 5) -> str:
+    s = only_alpha(text).replace("J", "I")
+    left = Bifid_encode(s[::2], key1, period).upper()
+    right = Bifid_encode(s[1::2], key2, period).upper()
+    return f"[TWINBIFID]{len(left)}|{left}{right}"
+
+
+def TwinBifid_decode(text: str, key1: str = "ALPHA", key2: str = "OMEGA", period: int | str = 5) -> str:
+    body = text
+    left_len = (len(body) + 1) // 2
+    if text.startswith("[TWINBIFID]") and "|" in text:
+        meta, body = text.split("|", 1)
+        left_len = int(meta[len("[TWINBIFID]"):])
+    left = Bifid_decode(body[:left_len], key1, period).upper()
+    right = Bifid_decode(body[left_len:], key2, period).upper()
+    out = []
+    for i in range(max(len(left), len(right))):
+        if i < len(left):
+            out.append(left[i])
+        if i < len(right):
+            out.append(right[i])
+    return "".join(out).lower()
+
+
+def TwoSquareVertical_encode(text: str, key_top: str = "EXAMPLE", key_bottom: str = "KEYWORD") -> str:
+    _, posT, revT = _key_square_5(key_top)
+    _, posB, revB = _key_square_5(key_bottom)
+    out = []
+    for a, b in _playfair_prepare(text):
+        rt, ct = posT[a]
+        rb, cb = posB[b]
+        if ct == cb:
+            out.append(revT[((rt + 1) % 5, ct)])
+            out.append(revB[((rb + 1) % 5, cb)])
+        else:
+            out.append(revT[(rt, cb)])
+            out.append(revB[(rb, ct)])
+    return "".join(out).lower()
+
+
+def TwoSquareVertical_decode(text: str, key_top: str = "EXAMPLE", key_bottom: str = "KEYWORD") -> str:
+    _, posT, revT = _key_square_5(key_top)
+    _, posB, revB = _key_square_5(key_bottom)
+    s = only_alpha(text)
+    if len(s) % 2:
+        s += "X"
+    out = []
+    for a, b in chunk(s, 2):
+        rt, ct = posT[a]
+        rb, cb = posB[b]
+        if ct == cb:
+            out.append(revT[((rt - 1) % 5, ct)])
+            out.append(revB[((rb - 1) % 5, cb)])
+        else:
+            out.append(revT[(rt, cb)])
+            out.append(revB[(rb, ct)])
+    return "".join(out).lower()
+
+
+def _route_positions(rows: int, cols: int, preset: str) -> List[Tuple[int, int]]:
+    preset = str(preset or "row").lower().replace("_", "-")
+    if preset in {"column", "col", "down-columns"}:
+        return [(r, c) for c in range(cols) for r in range(rows)]
+    if preset in {"reverse-row", "reverse", "rtl"}:
+        return [(r, c) for r in range(rows) for c in range(cols - 1, -1, -1)]
+    if preset in {"boustrophedon", "snake"}:
+        out = []
+        for r in range(rows):
+            rng = range(cols) if r % 2 == 0 else range(cols - 1, -1, -1)
+            out.extend((r, c) for c in rng)
+        return out
+    return [(r, c) for r in range(rows) for c in range(cols)]
+
+
+def ReadingOrderRoute_encode(text: str, rows: int | str = 5, cols: int | str = 5, preset: str = "column", pad: str = "X") -> str:
+    rows, cols = int(rows), int(cols)
+    block = rows * cols
+    padch = (pad or "X")[0]
+    s = text
+    if len(s) % block:
+        s += padch * (block - len(s) % block)
+    positions = _route_positions(rows, cols, preset)
+    out = []
+    for off in range(0, len(s), block):
+        grid = [list(s[off + r * cols:off + (r + 1) * cols]) for r in range(rows)]
+        out.extend(grid[r][c] for r, c in positions)
+    return "".join(out)
+
+
+def ReadingOrderRoute_decode(text: str, rows: int | str = 5, cols: int | str = 5, preset: str = "column", pad: str = "X") -> str:
+    rows, cols = int(rows), int(cols)
+    block = rows * cols
+    if len(text) % block:
+        return "Err:ciphertext length must be a multiple of rows*cols"
+    positions = _route_positions(rows, cols, preset)
+    out = []
+    for off in range(0, len(text), block):
+        grid = [[""] * cols for _ in range(rows)]
+        for ch, (r, c) in zip(text[off:off + block], positions):
+            grid[r][c] = ch
+        out.extend("".join(row) for row in grid)
+    return "".join(out).rstrip((pad or "X")[0])
+
+
+def _rotate_grid_clockwise(grid: List[List[str]]) -> List[List[str]]:
+    return [list(row) for row in zip(*grid[::-1])]
+
+
+def _rotate_grid_counterclockwise(grid: List[List[str]]) -> List[List[str]]:
+    return [list(row) for row in zip(*grid)][::-1]
+
+
+def RotatingSquareRoute_encode(text: str, size: int | str = 5, turns: int | str = 1, pad: str = "X") -> str:
+    size = int(size)
+    turns = int(turns) % 4
+    block = size * size
+    padch = (pad or "X")[0]
+    s = text
+    if len(s) % block:
+        s += padch * (block - len(s) % block)
+    out = []
+    for off in range(0, len(s), block):
+        grid = [list(s[off + r * size:off + (r + 1) * size]) for r in range(size)]
+        for _ in range(turns):
+            grid = _rotate_grid_clockwise(grid)
+        out.extend("".join(row) for row in grid)
+    return "".join(out)
+
+
+def RotatingSquareRoute_decode(text: str, size: int | str = 5, turns: int | str = 1, pad: str = "X") -> str:
+    size = int(size)
+    turns = int(turns) % 4
+    block = size * size
+    if len(text) % block:
+        return "Err:ciphertext length must be a multiple of size*size"
+    out = []
+    for off in range(0, len(text), block):
+        grid = [list(text[off + r * size:off + (r + 1) * size]) for r in range(size)]
+        for _ in range(turns):
+            grid = _rotate_grid_counterclockwise(grid)
+        out.extend("".join(row) for row in grid)
+    return "".join(out).rstrip((pad or "X")[0])
+
+
+def _parse_grille_mask(mask: str, rows: int, cols: int) -> List[Tuple[int, int]]:
+    compact = "".join(ch for ch in str(mask) if ch in "01Xx#.")
+    if len(compact) != rows * cols:
+        raise ValueError("mask must contain rows*cols mask characters")
+    holes = []
+    for i, ch in enumerate(compact):
+        if ch in "1Xx#":
+            holes.append(divmod(i, cols))
+    if not holes:
+        raise ValueError("mask must contain at least one hole")
+    return holes
+
+
+def GrilleMask_encode(text: str, rows: int | str = 5, cols: int | str = 5, mask: str = "1000001000001000001000001", pad: str = "X") -> str:
+    rows, cols = int(rows), int(cols)
+    holes = _parse_grille_mask(mask, rows, cols)
+    block = len(holes)
+    padch = (pad or "X")[0]
+    s = text
+    if len(s) % block:
+        s += padch * (block - len(s) % block)
+    out = []
+    for off in range(0, len(s), block):
+        grid = [[padch] * cols for _ in range(rows)]
+        for ch, (r, c) in zip(s[off:off + block], holes):
+            grid[r][c] = ch
+        out.extend("".join(row) for row in grid)
+    return "".join(out)
+
+
+def GrilleMask_decode(text: str, rows: int | str = 5, cols: int | str = 5, mask: str = "1000001000001000001000001", pad: str = "X") -> str:
+    rows, cols = int(rows), int(cols)
+    holes = _parse_grille_mask(mask, rows, cols)
+    cell_count = rows * cols
+    if len(text) % cell_count:
+        return "Err:ciphertext length must be a multiple of rows*cols"
+    out = []
+    for off in range(0, len(text), cell_count):
+        block = text[off:off + cell_count]
+        for r, c in holes:
+            out.append(block[r * cols + c])
+    return "".join(out).rstrip((pad or "X")[0])
+
+
+def _rotate_pos_cw(r: int, c: int, n: int) -> Tuple[int, int]:
+    return c, n - 1 - r
+
+
+def _fleissner_holes(mask: str, size: int) -> List[Tuple[int, int]]:
+    compact = "".join(ch for ch in str(mask) if ch in "01Xx#.")
+    if len(compact) != size * size:
+        raise ValueError("mask must contain size*size mask characters")
+    holes = [divmod(i, size) for i, ch in enumerate(compact) if ch in "1Xx#"]
+    if len(holes) != (size * size) // 4:
+        raise ValueError("turning grille mask must contain exactly size*size/4 holes")
+    seen = set()
+    for r, c in holes:
+        rr, cc = r, c
+        for _ in range(4):
+            if (rr, cc) in seen:
+                raise ValueError("turning grille mask overlaps during rotation")
+            seen.add((rr, cc))
+            rr, cc = _rotate_pos_cw(rr, cc, size)
+    if len(seen) != size * size:
+        raise ValueError("turning grille mask does not cover the full square")
+    return holes
+
+
+def FleissnerGrille_encode(text: str, size: int | str = 4, mask: str = "1100110000000000", pad: str = "X") -> str:
+    size = int(size)
+    holes = _fleissner_holes(mask, size)
+    block = size * size
+    padch = (pad or "X")[0]
+    s = text
+    if len(s) % block:
+        s += padch * (block - len(s) % block)
+    out = []
+    for off in range(0, len(s), block):
+        grid = [[padch] * size for _ in range(size)]
+        idx = off
+        current = holes[:]
+        for _ in range(4):
+            for r, c in current:
+                grid[r][c] = s[idx]
+                idx += 1
+            current = [_rotate_pos_cw(r, c, size) for r, c in current]
+        out.extend("".join(row) for row in grid)
+    return "".join(out)
+
+
+def FleissnerGrille_decode(text: str, size: int | str = 4, mask: str = "1100110000000000", pad: str = "X") -> str:
+    size = int(size)
+    holes = _fleissner_holes(mask, size)
+    block = size * size
+    if len(text) % block:
+        return "Err:ciphertext length must be a multiple of size*size"
+    out = []
+    for off in range(0, len(text), block):
+        grid = [list(text[off + r * size:off + (r + 1) * size]) for r in range(size)]
+        current = holes[:]
+        for _ in range(4):
+            for r, c in current:
+                out.append(grid[r][c])
+            current = [_rotate_pos_cw(r, c, size) for r, c in current]
+    return "".join(out).rstrip((pad or "X")[0])
+
+
+def RasterBits_encode(text: str, width: int | str = 8, on: str = "#", off: str = ".") -> str:
+    width = max(1, int(width))
+    bits = "".join(f"{byte:08b}" for byte in text.encode("utf-8"))
+    rows = [bits[i:i+width] for i in range(0, len(bits), width)]
+    on = (on or "#")[0]
+    off = (off or ".")[0]
+    return "\n".join("".join(on if bit == "1" else off for bit in row) for row in rows)
+
+
+def RasterBits_decode(text: str, width: int | str = 8, on: str = "#", off: str = ".") -> str:
+    on = (on or "#")[0]
+    bits = "".join("1" if ch == on else "0" for ch in text if ch == on or ch == (off or ".")[0])
+    bits = bits[:len(bits) - (len(bits) % 8)]
+    try:
+        return bytes(int(bits[i:i+8], 2) for i in range(0, len(bits), 8)).decode("utf-8")
+    except Exception as exc:
+        return f"Err:{exc}"
+
+
+def _hagelin_stream(seed: str, wheels: str = "17,19,21,23,25,26"):
+    periods = [max(2, int(x.strip())) for x in str(wheels).split(",") if x.strip()] or [17, 19, 21, 23, 25, 26]
+    state = sum((i + 1) * ord(ch) for i, ch in enumerate(seed or "HAGELIN")) or 1
+    positions = [state % p for p in periods]
+    while True:
+        total = 0
+        for i, p in enumerate(periods):
+            positions[i] = (positions[i] + 1 + (state % (i + 2))) % p
+            total += (positions[i] * (i + 3) + state) % 26
+        state = (state * 1664525 + 1013904223 + total) & 0xFFFFFFFF
+        yield total % 26
+
+
+def HagelinToy_encode(text: str, seed: str = "HAGELIN", wheels: str = "17,19,21,23,25,26") -> str:
+    stream = _hagelin_stream(seed, wheels)
+    out = []
+    for ch in text:
+        up = ch.upper()
+        if up in ALPHA_SET:
+            k = next(stream)
+            mapped = ALPHA[(ALPHA.index(up) + k) % 26]
+            out.append(mapped if ch.isupper() else mapped.lower())
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+def HagelinToy_decode(text: str, seed: str = "HAGELIN", wheels: str = "17,19,21,23,25,26") -> str:
+    stream = _hagelin_stream(seed, wheels)
+    out = []
+    for ch in text:
+        up = ch.upper()
+        if up in ALPHA_SET:
+            k = next(stream)
+            mapped = ALPHA[(ALPHA.index(up) - k) % 26]
+            out.append(mapped if ch.isupper() else mapped.lower())
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+_HOMOPHONIC_POOLS = {
+    "E": ["00", "01", "02", "03"], "T": ["04", "05", "06"], "A": ["07", "08", "09"],
+    "O": ["10", "11", "12"], "I": ["13", "14"], "N": ["15", "16"], "S": ["17", "18"],
+    "H": ["19", "20"], "R": ["21", "22"], "D": ["23", "24"], "L": ["25", "26"],
+    "C": ["27", "28"], "U": ["29", "30"], "M": ["31", "32"], "W": ["33", "34"],
+    "F": ["35"], "G": ["36"], "Y": ["37"], "P": ["38"], "B": ["39"], "V": ["40"],
+    "K": ["41"], "J": ["42"], "X": ["43"], "Q": ["44"], "Z": ["45"],
+}
+_HOMOPHONIC_REVERSE = {code: ch for ch, codes in _HOMOPHONIC_POOLS.items() for code in codes}
+
+
+def HomophonicSubstitution_encode(text: str) -> str:
+    counts = {ch: 0 for ch in _HOMOPHONIC_POOLS}
+    out = []
+    for ch in to_upper(text):
+        if ch in _HOMOPHONIC_POOLS:
+            pool = _HOMOPHONIC_POOLS[ch]
+            out.append(pool[counts[ch] % len(pool)])
+            counts[ch] += 1
+        elif ch.isspace():
+            out.append("/")
+    return " ".join(out)
+
+
+def HomophonicSubstitution_decode(text: str) -> str:
+    out = []
+    for token in text.replace("/", " / ").split():
+        if token == "/":
+            out.append(" ")
+        else:
+            out.append(_HOMOPHONIC_REVERSE.get(token.zfill(2), ""))
+    return "".join(out).lower()
+
+
+def HeadlinePuzzle_encode(text: str, filler_word: str = "headline") -> str:
+    filler = filler_word or "headline"
+    words = []
+    for ch in text:
+        if ch.isalpha():
+            head = ch.upper()
+            words.append(head + filler[1:])
+        elif ch.isspace():
+            words.append("/")
+    return " ".join(words)
+
+
+def HeadlinePuzzle_decode(text: str, filler_word: str = "headline") -> str:
+    out = []
+    for token in text.split():
+        if token == "/":
+            out.append(" ")
+        elif token:
+            out.append(token[0])
+    return "".join(out).lower()
+
+
+def MurrayCode_encode(text: str) -> str:
+    bits = "".join(f"{byte:08b}" for byte in text.encode("utf-8"))
+    if len(bits) % 5:
+        bits += "0" * (5 - len(bits) % 5)
+    return " ".join(bits[i:i+5] for i in range(0, len(bits), 5))
+
+
+def MurrayCode_decode(text: str) -> str:
+    bits = "".join(ch for ch in text if ch in "01")
+    bits = bits[:len(bits) - (len(bits) % 8)]
+    try:
+        return bytes(int(bits[i:i+8], 2) for i in range(0, len(bits), 8)).decode("utf-8")
+    except Exception as exc:
+        return f"Err:{exc}"
+
+
+_MARITIME_FLAGS = {ch: f"[{ch}-flag]" for ch in ALPHA}
+_ICS_PHRASES = {
+    "A": "I have a diver down; keep well clear at slow speed",
+    "B": "I am taking in, discharging, or carrying dangerous goods",
+    "C": "Yes",
+    "D": "Keep clear of me; I am maneuvering with difficulty",
+    "E": "I am altering my course to starboard",
+    "F": "I am disabled; communicate with me",
+    "G": "I require a pilot",
+    "H": "I have a pilot on board",
+    "I": "I am altering my course to port",
+    "J": "I am on fire and have dangerous cargo; keep clear",
+    "K": "I wish to communicate with you",
+    "L": "You should stop your vessel instantly",
+    "M": "My vessel is stopped and making no way",
+    "N": "No",
+    "O": "Man overboard",
+    "P": "All persons should report on board; vessel is about to proceed",
+    "Q": "My vessel is healthy and I request free pratique",
+    "R": "Received",
+    "S": "I am operating astern propulsion",
+    "T": "Keep clear of me; I am engaged in pair trawling",
+    "U": "You are running into danger",
+    "V": "I require assistance",
+    "W": "I require medical assistance",
+    "X": "Stop carrying out your intentions and watch for my signals",
+    "Y": "I am dragging my anchor",
+    "Z": "I require a tug",
+}
+_CIRTH_RUNES = dict(zip(ALPHA, "ᚠᚢᚦᚨᚱᚲᚷᚹᚺᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛟᛞᚪᚫᚣ"))
+_TENGWAR_TOKENS = {
+    "A":"[tinco]", "B":"[parma]", "C":"[calma]", "D":"[quesse]", "E":"[ando]", "F":"[umbar]",
+    "G":"[anga]", "H":"[ungwe]", "I":"[thule]", "J":"[formen]", "K":"[harma]", "L":"[hwesta]",
+    "M":"[anto]", "N":"[ampa]", "O":"[anca]", "P":"[unque]", "Q":"[numen]", "R":"[malta]",
+    "S":"[noldo]", "T":"[nwalme]", "U":"[ore]", "V":"[vala]", "W":"[anna]", "X":"[vilya]",
+    "Y":"[romen]", "Z":"[arda]",
+}
+_ZODIAC_SYMBOLS = dict(zip(ALPHA, "♈♉♊♋♌♍♎♏♐♑♒♓☉☽☿♀♂♃♄⛢♆♇⚷⚸⚹⚺"))
+_WINGDINGS_TOKENS = {ch: f"[wd-{i:02d}]" for i, ch in enumerate(ALPHA, 1)}
+
+
+def _simple_symbol_encode(text: str, mapping: Dict[str, str]) -> str:
+    out = []
+    for ch in text:
+        up = ch.upper()
+        if up in mapping:
+            out.append(mapping[up])
+        elif ch.isspace():
+            out.append(" ")
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+def _simple_symbol_decode(text: str, mapping: Dict[str, str]) -> str:
+    rev = {v: k for k, v in mapping.items()}
+    if any(token.startswith("[") for token in mapping.values()):
+        out = text
+        for token, ch in sorted(rev.items(), key=lambda item: -len(item[0])):
+            out = out.replace(token, ch.lower())
+        return out
+    return "".join(rev.get(ch, " " if ch.isspace() else ch) for ch in text).lower()
+
+
+def MaritimeFlags_encode(text: str) -> str:
+    return _simple_symbol_encode(text, _MARITIME_FLAGS)
+
+
+def MaritimeFlags_decode(text: str) -> str:
+    return _simple_symbol_decode(text, _MARITIME_FLAGS)
+
+
+def InternationalSignals_encode(text: str) -> str:
+    out = []
+    for ch in only_alpha(text, keep_spaces=True):
+        if ch == " ":
+            out.append("/")
+        elif ch in _ICS_PHRASES:
+            out.append(f"{ch}: {_ICS_PHRASES[ch]}")
+    return " | ".join(out)
+
+
+def InternationalSignals_decode(text: str) -> str:
+    rev = {re.sub(r"[^A-Z0-9]+", "", v.upper()): k for k, v in _ICS_PHRASES.items()}
+    out = []
+    for part in re.split(r"\s*\|\s*|\n+", text):
+        part = part.strip()
+        if not part:
+            continue
+        if part == "/":
+            out.append(" ")
+            continue
+        m = re.match(r"([A-Za-z])\s*:", part)
+        if m:
+            out.append(m.group(1).upper())
+            continue
+        norm = re.sub(r"[^A-Z0-9]+", "", part.upper())
+        out.append(rev.get(norm, part[:1].upper()))
+    return "".join(out).lower()
+
+
+def Cirth_encode(text: str) -> str:
+    return _simple_symbol_encode(text, _CIRTH_RUNES)
+
+
+def Cirth_decode(text: str) -> str:
+    return _simple_symbol_decode(text, _CIRTH_RUNES)
+
+
+def TengwarTokens_encode(text: str) -> str:
+    return _simple_symbol_encode(text, _TENGWAR_TOKENS)
+
+
+def TengwarTokens_decode(text: str) -> str:
+    return _simple_symbol_decode(text, _TENGWAR_TOKENS)
+
+
+def ZodiacSymbols_encode(text: str) -> str:
+    return _simple_symbol_encode(text, _ZODIAC_SYMBOLS)
+
+
+def ZodiacSymbols_decode(text: str) -> str:
+    return _simple_symbol_decode(text, _ZODIAC_SYMBOLS)
+
+
+def WingdingsTokens_encode(text: str) -> str:
+    return _simple_symbol_encode(text, _WINGDINGS_TOKENS)
+
+
+def WingdingsTokens_decode(text: str) -> str:
+    return _simple_symbol_decode(text, _WINGDINGS_TOKENS)
+
+
+_SEMAPHORE_ARM_PAIRS = [f"{a}-{b}" for a in range(1, 9) for b in range(a + 1, 9)]
+_SEMAPHORE_ARMS = {ch: _SEMAPHORE_ARM_PAIRS[i] for i, ch in enumerate(ALPHA)}
+_SEMAPHORE_ARMS_REV = {v: k for k, v in _SEMAPHORE_ARMS.items()}
+_PIGPEN_UNICODE = dict(zip(ALPHA, "△◇□▽○◁▷⬠⬡⬢⬣⬤◐◑◒◓◔◕◖◗◜◝◞◟◆◇"))
+_PIGPEN_UNICODE_REV = {v: k for k, v in _PIGPEN_UNICODE.items()}
+_BRAILLE_GRADE1_DIGITS = dict(zip("1234567890", "ABCDEFGHIJ"))
+
+
+def SemaphoreArms_encode(text: str) -> str:
+    out = []
+    for ch in to_upper(text):
+        if ch in _SEMAPHORE_ARMS:
+            out.append(_SEMAPHORE_ARMS[ch])
+        elif ch.isspace():
+            out.append("/")
+    return "[SEMARMS]|" + " ".join(out)
+
+
+def SemaphoreArms_decode(text: str) -> str:
+    s = text[len("[SEMARMS]|"):] if text.startswith("[SEMARMS]|") else text
+    out = []
+    for token in s.replace("/", " / ").split():
+        if token == "/":
+            out.append(" ")
+        else:
+            out.append(_SEMAPHORE_ARMS_REV.get(token, ""))
+    return "".join(out).lower()
+
+
+def PigpenUnicode_encode(text: str) -> str:
+    return _simple_symbol_encode(text, _PIGPEN_UNICODE)
+
+
+def PigpenUnicode_decode(text: str) -> str:
+    return _simple_symbol_decode(text, _PIGPEN_UNICODE)
+
+
+def BrailleGrade1_encode(text: str) -> str:
+    out = []
+    for ch in text:
+        up = ch.upper()
+        if ch.isdigit():
+            out.append("⠼" + chr(0x2800 + BRAILLE_PATTERNS[_BRAILLE_GRADE1_DIGITS[ch]]))
+        elif up in BRAILLE_PATTERNS:
+            out.append(chr(0x2800 + BRAILLE_PATTERNS[up]))
+        elif ch.isspace():
+            out.append(" ")
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+def BrailleGrade1_decode(text: str) -> str:
+    digit_rev = {chr(0x2800 + BRAILLE_PATTERNS[v]): k for k, v in _BRAILLE_GRADE1_DIGITS.items()}
+    out = []
+    i = 0
+    while i < len(text):
+        if text[i] == "⠼" and i + 1 < len(text):
+            out.append(digit_rev.get(text[i + 1], ""))
+            i += 2
+            continue
+        out.append(BRAILLE_REV.get(text[i], " " if text[i].isspace() else text[i]))
+        i += 1
+    return "".join(out).lower()
+
+
+def BaconBiliteral_encode(text: str, a_char: str = "A", b_char: str = "B") -> str:
+    a_char = (a_char or "A")[0]
+    b_char = (b_char or "B")[0]
+    out = []
+    for ch in only_alpha(text):
+        bits = f"{ALPHA.index(ch):05b}"
+        out.append("".join(b_char if bit == "1" else a_char for bit in bits))
+    return " ".join(out)
+
+
+def BaconBiliteral_decode(text: str, a_char: str = "A", b_char: str = "B") -> str:
+    a_char = (a_char or "A")[0]
+    b_char = (b_char or "B")[0]
+    compact = "".join(ch for ch in text if ch in {a_char, b_char})
+    out = []
+    for group in chunk(compact[:len(compact) - (len(compact) % 5)], 5):
+        val = int("".join("1" if ch == b_char else "0" for ch in group), 2)
+        if 0 <= val < 26:
+            out.append(ALPHA[val])
+    return "".join(out).lower()
+
+
+def WhitespaceBinary_encode(text: str) -> str:
+    bits = "".join(f"{byte:08b}" for byte in text.encode("utf-8"))
+    return "".join("\t" if bit == "1" else " " for bit in bits)
+
+
+def WhitespaceBinary_decode(text: str) -> str:
+    bits = "".join("1" if ch == "\t" else "0" for ch in text if ch in {" ", "\t"})
+    bits = bits[:len(bits) - (len(bits) % 8)]
+    try:
+        return bytes(int(bits[i:i+8], 2) for i in range(0, len(bits), 8)).decode("utf-8")
+    except Exception as exc:
+        return f"Err:{exc}"
+
+
+def SnowSteg_encode(text: str, cover: str = "snow") -> str:
+    bits = "".join(f"{byte:08b}" for byte in text.encode("utf-8"))
+    lines = (cover or "snow").splitlines() or [cover or "snow"]
+    out = []
+    for i, bit in enumerate(bits):
+        base = lines[i % len(lines)].rstrip(" ")
+        out.append(base + ("  " if bit == "1" else " "))
+    return "[SNOW]" + str(len(bits)) + "|\n" + "\n".join(out)
+
+
+def SnowSteg_decode(text: str, cover: str = "snow") -> str:
+    body = text
+    bit_len = None
+    if text.startswith("[SNOW]") and "|\n" in text:
+        meta, body = text.split("|\n", 1)
+        bit_len = int(meta[len("[SNOW]"):])
+    bits = []
+    for line in body.splitlines():
+        spaces = len(line) - len(line.rstrip(" "))
+        if spaces:
+            bits.append("1" if spaces >= 2 else "0")
+    bitstr = "".join(bits)
+    if bit_len is not None:
+        bitstr = bitstr[:bit_len]
+    bitstr = bitstr[:len(bitstr) - (len(bitstr) % 8)]
+    try:
+        return bytes(int(bitstr[i:i+8], 2) for i in range(0, len(bitstr), 8)).decode("utf-8")
+    except Exception as exc:
+        return f"Err:{exc}"
+
+
+_RFC1924_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&()*+-;<=>?@^_`{|}~"
+
+
+def _base_n_encode_bytes(data: bytes, alphabet: str) -> str:
+    if not data:
+        return ""
+    base = len(alphabet)
+    n = int.from_bytes(data, "big")
+    out = []
+    while n:
+        n, rem = divmod(n, base)
+        out.append(alphabet[rem])
+    leading = len(data) - len(data.lstrip(b"\x00"))
+    return alphabet[0] * leading + "".join(reversed(out or [alphabet[0]]))
+
+
+def _base_n_decode_bytes(text: str, alphabet: str) -> bytes:
+    if not text:
+        return b""
+    base = len(alphabet)
+    lookup = {ch: i for i, ch in enumerate(alphabet)}
+    n = 0
+    for ch in text:
+        if ch not in lookup:
+            continue
+        n = n * base + lookup[ch]
+    leading = len(text) - len(text.lstrip(alphabet[0]))
+    body = n.to_bytes(max(1, (n.bit_length() + 7) // 8), "big") if n else b""
+    return b"\x00" * leading + body
+
+
+def RFC1924Base85_encode(text: str) -> str:
+    data = text.encode("utf-8")
+    return f"[RFC1924-85]{len(data)}|" + _base_n_encode_bytes(data, _RFC1924_ALPHABET)
+
+
+def RFC1924Base85_decode(text: str) -> str:
+    body = text
+    expected = None
+    if text.startswith("[RFC1924-85]") and "|" in text:
+        meta, body = text.split("|", 1)
+        expected = int(meta[len("[RFC1924-85]"):])
+    try:
+        data = _base_n_decode_bytes(body, _RFC1924_ALPHABET)
+        if expected is not None:
+            data = data[-expected:] if expected else b""
+        return data.decode("utf-8")
+    except Exception as exc:
+        return f"Err:{exc}"
+
+
+def PEMArmor_encode(text: str, label: str = "MESSAGE") -> str:
+    label = (label or "MESSAGE").upper()
+    b64 = base64.b64encode(text.encode("utf-8")).decode("ascii")
+    lines = "\n".join(chunk(b64, 64))
+    return f"-----BEGIN {label}-----\n{lines}\n-----END {label}-----"
+
+
+def PEMArmor_decode(text: str, label: str = "MESSAGE") -> str:
+    lines = [line.strip() for line in text.strip().splitlines() if line.strip() and not line.startswith("-----")]
+    try:
+        return base64.b64decode("".join(lines)).decode("utf-8")
+    except Exception as exc:
+        return f"Err:{exc}"
+
+
+def MessagePackHex_encode(text: str) -> str:
+    data = text.encode("utf-8")
+    if len(data) <= 31:
+        packed = bytes([0xA0 | len(data)]) + data
+    elif len(data) <= 255:
+        packed = b"\xD9" + bytes([len(data)]) + data
+    elif len(data) <= 65535:
+        packed = b"\xDA" + len(data).to_bytes(2, "big") + data
+    else:
+        packed = b"\xDB" + len(data).to_bytes(4, "big") + data
+    return packed.hex().upper()
+
+
+def MessagePackHex_decode(text: str) -> str:
+    try:
+        data = bytes.fromhex("".join(ch for ch in text if ch in string.hexdigits))
+        if not data:
+            return ""
+        first = data[0]
+        if 0xA0 <= first <= 0xBF:
+            length = first & 0x1F; start = 1
+        elif first == 0xD9:
+            length = data[1]; start = 2
+        elif first == 0xDA:
+            length = int.from_bytes(data[1:3], "big"); start = 3
+        elif first == 0xDB:
+            length = int.from_bytes(data[1:5], "big"); start = 5
+        else:
+            return "Err:unsupported MessagePack type"
+        return data[start:start+length].decode("utf-8")
+    except Exception as exc:
+        return f"Err:{exc}"
+
+
+def OpenPGPArmor_encode(text: str, label: str = "MESSAGE") -> str:
+    label = (label or "MESSAGE").upper()
+    b64 = base64.b64encode(text.encode("utf-8")).decode("ascii")
+    lines = "\n".join(chunk(b64, 64))
+    return f"-----BEGIN PGP {label}-----\n\n{lines}\n-----END PGP {label}-----"
+
+
+def OpenPGPArmor_decode(text: str, label: str = "MESSAGE") -> str:
+    lines = [line.strip() for line in text.splitlines() if line.strip() and not line.startswith("-----")]
+    try:
+        return base64.b64decode("".join(lines)).decode("utf-8")
+    except Exception as exc:
+        return f"Err:{exc}"
+
+
+def _intel_hex_record(addr: int, rectype: int, data: bytes) -> str:
+    length = len(data)
+    fields = bytes([length, (addr >> 8) & 0xFF, addr & 0xFF, rectype]) + data
+    checksum = (-sum(fields)) & 0xFF
+    return ":" + fields.hex().upper() + f"{checksum:02X}"
+
+
+def IntelHex_encode(text: str, bytes_per_record: int | str = 16) -> str:
+    data = text.encode("utf-8")
+    n = max(1, int(bytes_per_record))
+    lines = []
+    for addr in range(0, len(data), n):
+        lines.append(_intel_hex_record(addr & 0xFFFF, 0, data[addr:addr+n]))
+    lines.append(_intel_hex_record(0, 1, b""))
+    return "\n".join(lines)
+
+
+def IntelHex_decode(text: str, bytes_per_record: int | str = 16) -> str:
+    out = bytearray()
+    try:
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            if not line.startswith(":"):
+                return "Err:invalid Intel HEX record"
+            raw = bytes.fromhex(line[1:])
+            length, rectype = raw[0], raw[3]
+            data = raw[4:4+length]
+            if ((sum(raw[:-1]) + raw[-1]) & 0xFF) != 0:
+                return "Err:Intel HEX checksum mismatch"
+            if rectype == 0:
+                out.extend(data)
+            elif rectype == 1:
+                break
+        return bytes(out).decode("utf-8")
+    except Exception as exc:
+        return f"Err:{exc}"
+
+
+def _srecord_line(addr: int, data: bytes) -> str:
+    addr_bytes = addr.to_bytes(2, "big")
+    count = len(addr_bytes) + len(data) + 1
+    body = bytes([count]) + addr_bytes + data
+    checksum = (~sum(body)) & 0xFF
+    return "S1" + body.hex().upper() + f"{checksum:02X}"
+
+
+def MotorolaSRecord_encode(text: str, bytes_per_record: int | str = 16) -> str:
+    data = text.encode("utf-8")
+    n = max(1, int(bytes_per_record))
+    lines = []
+    for addr in range(0, len(data), n):
+        lines.append(_srecord_line(addr & 0xFFFF, data[addr:addr+n]))
+    lines.append("S9030000FC")
+    return "\n".join(lines)
+
+
+def MotorolaSRecord_decode(text: str, bytes_per_record: int | str = 16) -> str:
+    out = bytearray()
+    try:
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith("S9"):
+                break
+            if not line.startswith("S1"):
+                return "Err:unsupported S-record type"
+            raw = bytes.fromhex(line[2:])
+            count = raw[0]
+            if count != len(raw) - 1:
+                return "Err:S-record byte count mismatch"
+            if ((sum(raw[:-1]) + raw[-1]) & 0xFF) != 0xFF:
+                return "Err:S-record checksum mismatch"
+            out.extend(raw[3:-1])
+        return bytes(out).decode("utf-8")
+    except Exception as exc:
+        return f"Err:{exc}"
+
 # =============================================================================
 # Vigenère family
 # =============================================================================
@@ -1806,6 +3652,95 @@ def KeyboardReversed_decode(text: str) -> str:
     return apply_monoalpha(text, rev, qwerty, keep_others=True)
 
 
+_KEYBOARD_ROWS = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"]
+_KEYBOARD_POS = {ch: (r + 1, c + 1) for r, row in enumerate(_KEYBOARD_ROWS) for c, ch in enumerate(row)}
+_KEYBOARD_REV = {pos: ch for ch, pos in _KEYBOARD_POS.items()}
+
+def KeyboardCoordinate_encode(text: str, sep: str = ".") -> str:
+    out = []
+    for ch in text:
+        cu = ch.upper()
+        if cu in _KEYBOARD_POS:
+            r, c = _KEYBOARD_POS[cu]
+            out.append(f"{r}{sep}{c}")
+        elif ch.isspace():
+            out.append("/")
+        else:
+            out.append(ch)
+    return " ".join(out)
+
+def KeyboardCoordinate_decode(text: str, sep: str = ".") -> str:
+    out = []
+    for tok in text.replace("/", " / ").split():
+        if tok == "/":
+            out.append(" ")
+            continue
+        nums = re.findall(r"\d+", tok)
+        if len(nums) >= 2:
+            out.append(_KEYBOARD_REV.get((int(nums[0]), int(nums[1])), ""))
+        else:
+            out.append(tok)
+    return "".join(out).lower()
+
+def QWERTYAdjacent_encode(text: str, direction: str = "right") -> str:
+    direction = (direction or "right").lower()
+    dr, dc = {
+        "left": (0, -1), "right": (0, 1), "up": (-1, 0), "down": (1, 0),
+    }.get(direction, (0, 1))
+    out = []
+    for ch in text:
+        cu = ch.upper()
+        if cu in _KEYBOARD_POS:
+            r, c = _KEYBOARD_POS[cu]
+            row = _KEYBOARD_ROWS[r - 1]
+            if dr == 0:
+                nc = ((c - 1 + dc) % len(row)) + 1
+                rep = _KEYBOARD_REV[(r, nc)]
+            else:
+                nr = ((r - 1 + dr) % len(_KEYBOARD_ROWS)) + 1
+                nrow = _KEYBOARD_ROWS[nr - 1]
+                nc = min(c, len(nrow))
+                rep = _KEYBOARD_REV[(nr, nc)]
+            out.append(rep if ch.isupper() else rep.lower())
+        else:
+            out.append(ch)
+    return "".join(out)
+
+def QWERTYAdjacent_decode(text: str, direction: str = "right") -> str:
+    inverse = {"left": "right", "right": "left", "up": "down", "down": "up"}
+    return QWERTYAdjacent_encode(text, inverse.get((direction or "right").lower(), "left"))
+
+
+_CHESSBOARD_ALPH = ALPHA + string.digits
+_CHESSBOARD_SQUARES = [f"{file}{rank}" for rank in range(1, 9) for file in "ABCDEFGH"]
+_CHESSBOARD_MAP = {ch: _CHESSBOARD_SQUARES[i] for i, ch in enumerate(_CHESSBOARD_ALPH)}
+_CHESSBOARD_REV = {v: k for k, v in _CHESSBOARD_MAP.items()}
+
+def ChessboardCoordinate_encode(text: str) -> str:
+    out = []
+    for ch in text:
+        cu = ch.upper()
+        if cu in _CHESSBOARD_MAP:
+            out.append(_CHESSBOARD_MAP[cu])
+        elif ch.isspace():
+            out.append("/")
+        else:
+            out.append(ch)
+    return " ".join(out)
+
+def ChessboardCoordinate_decode(text: str) -> str:
+    out = []
+    for tok in text.replace("/", " / ").split():
+        up = tok.upper()
+        if up == "/":
+            out.append(" ")
+        elif up in _CHESSBOARD_REV:
+            out.append(_CHESSBOARD_REV[up])
+        else:
+            out.append(tok)
+    return "".join(out).lower()
+
+
 A1Z26_SEP = "-"
 
 def A1Z26_encode(text: str) -> str:
@@ -1903,6 +3838,64 @@ def MultiTap_decode(text: str) -> str:
         else:
             out.append(MULTITAP_REV.get(tok, tok))
     return "".join(out).lower()
+
+
+T9_GROUPS = {
+    "2": "ABC", "3": "DEF", "4": "GHI", "5": "JKL",
+    "6": "MNO", "7": "PQRS", "8": "TUV", "9": "WXYZ",
+}
+T9_MAP = {ch: digit for digit, letters in T9_GROUPS.items() for ch in letters}
+
+def T9_encode(text: str) -> str:
+    out = []
+    for ch in text:
+        cu = ch.upper()
+        if cu in T9_MAP:
+            out.append(T9_MAP[cu])
+        elif ch.isdigit():
+            out.append(ch)
+        elif ch.isspace():
+            out.append("/")
+        else:
+            out.append(ch)
+    return "".join(out)
+
+def T9_decode(text: str) -> str:
+    out = []
+    for ch in text:
+        if ch in T9_GROUPS:
+            out.append("[" + T9_GROUPS[ch] + "]")
+        elif ch == "/":
+            out.append(" ")
+        else:
+            out.append(ch)
+    return "".join(out).lower()
+
+def VanityPhone_encode(text: str, keep_punctuation: bool = True) -> str:
+    keep = str(keep_punctuation).lower() not in {"0", "false", "no", "off"}
+    out = []
+    for ch in text:
+        cu = ch.upper()
+        if cu in T9_MAP:
+            out.append(T9_MAP[cu])
+        elif ch.isdigit():
+            out.append(ch)
+        elif ch.isspace():
+            out.append("-")
+        elif keep:
+            out.append(ch)
+    return "".join(out)
+
+def VanityPhone_decode(text: str) -> str:
+    groups = []
+    for ch in text:
+        if ch in T9_GROUPS:
+            groups.append(T9_GROUPS[ch])
+        elif ch in "- .()/":
+            groups.append(" ")
+        else:
+            groups.append(ch)
+    return " ".join(g if len(g) > 1 else g for g in groups).lower()
 
 
 TAP_ALPH = "ABCDEFGHIJLMNOPQRSTUVWXYZ"  # C/K share a cell in the classic tap code.
@@ -2247,6 +4240,39 @@ def NullAcrostic_decode(text: str) -> str:
         elif tok:
             out.append(tok[0])
     return "".join(out).lower()
+
+def AcrosticGenerator_encode(text: str, filler_word: str = "cover") -> str:
+    tail = re.sub(r"^[A-Za-z]+", "", filler_word or "") or (filler_word[1:] if len(filler_word) > 1 else "word")
+    words = []
+    for ch in text:
+        if ch.isspace():
+            words.append("/")
+        elif ch.isalpha():
+            words.append(ch.upper() + tail)
+        else:
+            words.append(ch)
+    return " ".join(words)
+
+def AcrosticGenerator_decode(text: str, filler_word: str = "cover") -> str:
+    out = []
+    for tok in text.split():
+        if tok == "/":
+            out.append(" ")
+        elif tok:
+            out.append(tok[0])
+    return "".join(out).lower()
+
+def EveryNthHider_encode(text: str, n: int | str = 3, filler: str = "x") -> str:
+    n = max(1, int(n))
+    filler = (filler or "x")[0]
+    out = []
+    for ch in text:
+        out.append(filler * (n - 1) + ch)
+    return "".join(out)
+
+def EveryNthHider_decode(text: str, n: int | str = 3, filler: str = "x") -> str:
+    n = max(1, int(n))
+    return text[n-1::n]
 
 _SOLRESOL = ["do", "re", "mi", "fa", "sol", "la", "si"]
 _SOLRESOL_MAP = {ch: _SOLRESOL[i // 7] + "-" + _SOLRESOL[i % 7] for i, ch in enumerate(ALPHA)}
@@ -6249,7 +8275,7 @@ def SmartGuess(text: str) -> List[Tuple[str, str, float]]:
                 out = bytes(b ^ k for b in data)
                 try:
                     s = out.decode("utf-8", errors="replace")
-                except: 
+                except:
                     continue
                 sc = english_score(s)
                 if best is None or sc < best[2]:
@@ -6505,6 +8531,11 @@ def get_registry() -> List[CipherEntry]:
         CipherEntry("Keyed Caesar Progressive", KeyedCaesarProgressive_encode, KeyedCaesarProgressive_decode, [P("keyword","Keyword","CIPHER"), P("start","Start","0"), P("step","Step","1")]),
         CipherEntry("Word Substitution", WordSubstitution_encode, WordSubstitution_decode, [P("mapping","Mapping","hello=hola,world=mundo")]),
         CipherEntry("Codebook Substitution", CodebookSubstitution_encode, CodebookSubstitution_decode, [P("codebook","Codebook","attack=17,dawn=42")]),
+        CipherEntry("Book Cipher", BookCipher_encode, BookCipher_decode, [P("book","Book text",_BOOK_DEFAULT), P("sep","Fallback separator","-")]),
+        CipherEntry("Dictionary Code", DictionaryCode_encode, DictionaryCode_decode, [P("dictionary","Dictionary text",_BOOK_DEFAULT), P("sep","Index separator",".")]),
+        CipherEntry("Page-Line-Word-Letter", PageLineWordLetter_encode, PageLineWordLetter_decode, [P("book","Book text",_BOOK_DEFAULT), P("sep","Index separator",".")]),
+        CipherEntry("Homophonic Substitution", HomophonicSubstitution_encode, HomophonicSubstitution_decode, []),
+        CipherEntry("Headline Puzzle", HeadlinePuzzle_encode, HeadlinePuzzle_decode, [P("filler_word","Filler word","headline")]),
         CipherEntry("Della Porta Disk", DellaPortaDisk_encode, DellaPortaDisk_decode, [P("keyword","Disk keyword","CIPHER"), P("shift","Shift","0")]),
         CipherEntry("Condi", Condi_encode, Condi_decode, [P("keyword","Keyword","CIPHER"), P("start","Start","0")]),
         CipherEntry("Ragbaby", Ragbaby_encode, Ragbaby_decode, [P("keyword","Keyword","RAGBABY")]),
@@ -6531,6 +8562,20 @@ def get_registry() -> List[CipherEntry]:
         CipherEntry("Columnar Padded", ColumnarPadded_encode, ColumnarPadded_decode, [P("key","Key","CIPHER"), P("pad","Pad","X"), P("policy","Policy","minimal")]),
         CipherEntry("Spiral Inward Route", SpiralInwardRoute_encode, SpiralInwardRoute_decode, [P("rows","Rows","5"), P("cols","Cols","5"), P("pad","Pad","X")]),
         CipherEntry("Spiral Outward Route", SpiralOutwardRoute_encode, SpiralOutwardRoute_decode, [P("rows","Rows","5"), P("cols","Cols","5"), P("pad","Pad","X")]),
+        CipherEntry("Reading Order Route", ReadingOrderRoute_encode, ReadingOrderRoute_decode, [P("rows","Rows","5"), P("cols","Cols","5"), P("preset","Preset","column"), P("pad","Pad","X")]),
+        CipherEntry("Rotating Square Route", RotatingSquareRoute_encode, RotatingSquareRoute_decode, [P("size","Size","5"), P("turns","Turns","1"), P("pad","Pad","X")]),
+        CipherEntry("Grille Mask", GrilleMask_encode, GrilleMask_decode, [P("rows","Rows","5"), P("cols","Cols","5"), P("mask","Mask","1000001000001000001000001"), P("pad","Pad","X")]),
+        CipherEntry("Fleissner Grille", FleissnerGrille_encode, FleissnerGrille_decode, [P("size","Size","4"), P("mask","Mask","1100110000000000"), P("pad","Pad","X")]),
+        CipherEntry("Raster Bits", RasterBits_encode, RasterBits_decode, [P("width","Width","8"), P("on","On char","#"), P("off","Off char",".")]),
+        CipherEntry("Hagelin Toy", HagelinToy_encode, HagelinToy_decode, [P("seed","Seed","HAGELIN"), P("wheels","Wheels","17,19,21,23,25,26")]),
+        CipherEntry("AMSCO", AMSCO_encode, AMSCO_decode, [P("key","Key","CIPHER"), P("start_len","Starting cell length","1")]),
+        CipherEntry("Bazeries", Bazeries_encode, Bazeries_decode, [P("number","Number key","31415"), P("key","Alphabet key","BAZERIES")]),
+        CipherEntry("Disrupted Transposition", DisruptedTransposition_encode, DisruptedTransposition_decode, [P("key","Key","DISRUPT"), P("pad","Pad","X")]),
+        CipherEntry("Incomplete Columnar", IncompleteColumnar_encode, IncompleteColumnar_decode, [P("key","Key","CIPHER"), P("keep_spaces","Keep spaces","false")]),
+        CipherEntry("Double Columnar Irregular", DoubleColumnarIrregular_encode, DoubleColumnarIrregular_decode, [P("key1","Key 1","ALPHA"), P("key2","Key 2","OMEGA")]),
+        CipherEntry("Scytale Padded", ScytalePadded_encode, ScytalePadded_decode, [P("diameter","Diameter","5"), P("pad","Pad","X")]),
+        CipherEntry("Gromark", Gromark_encode, Gromark_decode, [P("primer","Primer digits","12345"), P("key","Alphabet key","GROMARK")]),
+        CipherEntry("Nihilist Substitution", NihilistSubstitution_encode, NihilistSubstitution_decode, [P("square_key","Square key","NIHILIST"), P("key","Additive key","KEY")]),
 
         # Vigenère family
         CipherEntry("Vigenere", Vigenere_encode, Vigenere_decode, [P("key","Key","LEMON")]),
@@ -6556,19 +8601,37 @@ def get_registry() -> List[CipherEntry]:
         CipherEntry("Leet Speak", LEET_encode, LEET_decode, []),
         CipherEntry("Keyboard Substitution", KeyboardSub_encode, KeyboardSub_decode, []),
         CipherEntry("Keyboard Reversed", KeyboardReversed_encode, KeyboardReversed_decode, []),
+        CipherEntry("Keyboard Coordinates", KeyboardCoordinate_encode, KeyboardCoordinate_decode, [P("sep","Separator",".")]),
+        CipherEntry("QWERTY Adjacent", QWERTYAdjacent_encode, QWERTYAdjacent_decode, [P("direction","Direction","right")]),
+        CipherEntry("Chessboard Coordinates", ChessboardCoordinate_encode, ChessboardCoordinate_decode, []),
         CipherEntry("A1Z26", A1Z26_encode, A1Z26_decode, []),
         CipherEntry("NATO Phonetic", NATO_encode, NATO_decode, []),
         CipherEntry("Multi-Tap Phone", MultiTap_encode, MultiTap_decode, []),
+        CipherEntry("T9 Keypad", T9_encode, T9_decode, []),
+        CipherEntry("Vanity Phone", VanityPhone_encode, VanityPhone_decode, [P("keep_punctuation","Keep punctuation","true")]),
         CipherEntry("Tap Code", TapCode_encode, TapCode_decode, []),
         CipherEntry("Braille Unicode", BrailleUnicode_encode, BrailleUnicode_decode, []),
+        CipherEntry("Braille Grade 1", BrailleGrade1_encode, BrailleGrade1_decode, []),
         CipherEntry("APCO Phonetic", APCO_encode, APCO_decode, []),
         CipherEntry("Baudot ITA2", BaudotITA2_encode, BaudotITA2_decode, []),
+        CipherEntry("Murray Code", MurrayCode_encode, MurrayCode_decode, []),
+        CipherEntry("Semaphore Arms", SemaphoreArms_encode, SemaphoreArms_decode, []),
+        CipherEntry("Pigpen Unicode", PigpenUnicode_encode, PigpenUnicode_decode, []),
         CipherEntry("Upside-down Text", UpsideDown_encode, UpsideDown_decode, []),
         CipherEntry("Mirror Text", MirrorText_encode, MirrorText_decode, []),
         CipherEntry("Zero-width Binary", ZeroWidthBinary_encode, ZeroWidthBinary_decode, []),
+        CipherEntry("Bacon Biliteral", BaconBiliteral_encode, BaconBiliteral_decode, [P("a_char","A character","A"), P("b_char","B character","B")]),
+        CipherEntry("Whitespace Binary", WhitespaceBinary_encode, WhitespaceBinary_decode, []),
+        CipherEntry("Snow Steg", SnowSteg_encode, SnowSteg_decode, [P("cover","Cover text","snow")]),
         CipherEntry("Elder Futhark", ElderFuthark_encode, ElderFuthark_decode, []),
         CipherEntry("Younger Futhark", YoungerFuthark_encode, YoungerFuthark_decode, []),
         CipherEntry("Ogham", Ogham_encode, Ogham_decode, []),
+        CipherEntry("Maritime Signal Flags", MaritimeFlags_encode, MaritimeFlags_decode, []),
+        CipherEntry("International Code Signals", InternationalSignals_encode, InternationalSignals_decode, []),
+        CipherEntry("Cirth", Cirth_encode, Cirth_decode, []),
+        CipherEntry("Tengwar Tokens", TengwarTokens_encode, TengwarTokens_decode, []),
+        CipherEntry("Zodiac Symbols", ZodiacSymbols_encode, ZodiacSymbols_decode, []),
+        CipherEntry("Wingdings Tokens", WingdingsTokens_encode, WingdingsTokens_decode, []),
         CipherEntry("Aurebesh", Aurebesh_encode, Aurebesh_decode, []),
         CipherEntry("Theban", Theban_encode, Theban_decode, []),
         CipherEntry("Standard Galactic", StandardGalactic_encode, StandardGalactic_decode, []),
@@ -6578,6 +8641,8 @@ def get_registry() -> List[CipherEntry]:
         CipherEntry("Zalgo", Zalgo_encode, Zalgo_decode, [P("intensity","Intensity","2")]),
         CipherEntry("Invisible Unicode", InvisibleUnicode_encode, InvisibleUnicode_decode, [P("cover","Cover text","")]),
         CipherEntry("Null Acrostic", NullAcrostic_encode, NullAcrostic_decode, []),
+        CipherEntry("Acrostic Generator", AcrosticGenerator_encode, AcrosticGenerator_decode, [P("filler_word","Filler word","cover")]),
+        CipherEntry("Every Nth Hider", EveryNthHider_encode, EveryNthHider_decode, [P("n","N","3"), P("filler","Filler","x")]),
         CipherEntry("Solresol", Solresol_encode, Solresol_decode, []),
         CipherEntry("Music Notes", MusicNotes_encode, MusicNotes_decode, []),
 
@@ -6598,6 +8663,7 @@ def get_registry() -> List[CipherEntry]:
         CipherEntry("Base62", Base62_encode, Base62_decode, []),
         CipherEntry("Base91", Base91_encode, Base91_decode, []),
         CipherEntry("Z85", Z85_encode, Z85_decode, []),
+        CipherEntry("RFC1924 Base85", RFC1924Base85_encode, RFC1924Base85_decode, []),
         CipherEntry("Base64", Base64_encode, Base64_decode, []),
         CipherEntry("Ascii85 (a85)", A85_encode, A85_decode, []),
         CipherEntry("Base85 (b85)", B85_encode, B85_decode, []),
@@ -6612,6 +8678,11 @@ def get_registry() -> List[CipherEntry]:
         CipherEntry("xxencode", XXEncode_encode, XXEncode_decode, []),
         CipherEntry("Netstring", Netstring_encode, Netstring_decode, []),
         CipherEntry("Bencode String", BencodeString_encode, BencodeString_decode, []),
+        CipherEntry("MessagePack Hex", MessagePackHex_encode, MessagePackHex_decode, []),
+        CipherEntry("PEM Armor", PEMArmor_encode, PEMArmor_decode, [P("label","Label","MESSAGE")]),
+        CipherEntry("OpenPGP Armor", OpenPGPArmor_encode, OpenPGPArmor_decode, [P("label","Label","MESSAGE")]),
+        CipherEntry("Intel HEX", IntelHex_encode, IntelHex_decode, [P("bytes_per_record","Bytes/record","16")]),
+        CipherEntry("Motorola S-Record", MotorolaSRecord_encode, MotorolaSRecord_decode, [P("bytes_per_record","Bytes/record","16")]),
         CipherEntry("Base100 Emoji", Base100Emoji_encode, Base100Emoji_decode, []),
         CipherEntry("Parity Bits", ParityBits_encode, ParityBits_decode, []),
         CipherEntry("Hex Color", HexColor_encode, HexColor_decode, []),
@@ -6662,9 +8733,16 @@ def get_registry() -> List[CipherEntry]:
 
         # Polygraphic / transposition
         CipherEntry("Polybius", Polybius_encode, Polybius_decode, [P("key","Key","KEYWORD")]),
+        CipherEntry("Polybius Custom Labels", PolybiusCustom_encode, PolybiusCustom_decode, [P("key","Key","KEYWORD"), P("row_labels","Row labels","12345"), P("col_labels","Column labels","12345"), P("sep","Separator"," ")]),
+        CipherEntry("Polybius Columnar", PolybiusColumnar_encode, PolybiusColumnar_decode, [P("square_key","Square key","KEYWORD"), P("route_key","Route key","CIPHER"), P("row_labels","Row labels","12345"), P("col_labels","Column labels","12345")]),
         CipherEntry("Playfair", Playfair_encode, Playfair_decode, [P("key","Key","KEYWORD")]),
+        CipherEntry("Playfair Q Omitted", PlayfairQOmitted_encode, PlayfairQOmitted_decode, [P("key","Key","KEYWORD"), P("filler","Filler","X")]),
+        CipherEntry("Playfair Preserve", PlayfairPreserve_encode, PlayfairPreserve_decode, [P("key","Key","KEYWORD"), P("filler","Filler","X")]),
+        CipherEntry("Playfair Padding", PlayfairPadding_encode, PlayfairPadding_decode, [P("key","Key","KEYWORD"), P("filler","Filler","X"), P("omit","Omit letter","J")]),
+        CipherEntry("Double Playfair", DoublePlayfair_encode, DoublePlayfair_decode, [P("key1","Key 1","ALPHA"), P("key2","Key 2","OMEGA")]),
         CipherEntry("Four-Square", FourSquare_encode, FourSquare_decode, [P("key1","Key 1","EXAMPLE"), P("key2","Key 2","KEYWORD")]),
         CipherEntry("Two-Square", TwoSquare_encode, TwoSquare_decode, [P("key1","Key L","EXAMPLE"), P("key2","Key R","KEYWORD")]),
+        CipherEntry("Two-Square Vertical", TwoSquareVertical_encode, TwoSquareVertical_decode, [P("key_top","Top key","EXAMPLE"), P("key_bottom","Bottom key","KEYWORD")]),
         CipherEntry("Columnar", Columnar_encode, Columnar_decode, [P("key","Key","CIPHER")]),
         CipherEntry("Myszkowski", Myszkowski_encode, Myszkowski_decode, [P("key","Key","TOMATO")]),
         CipherEntry("Caesar Box", CaesarBox_encode, CaesarBox_decode, [P("cols","Cols","4")]),
@@ -6672,12 +8750,22 @@ def get_registry() -> List[CipherEntry]:
         CipherEntry("Double Transposition", DoubleTransposition_encode, DoubleTransposition_decode, [P("key1","Key 1","EXAMPLE"), P("key2","Key 2","KEYWORD")]),
         CipherEntry("Route Cipher", Route_encode, Route_decode, [P("rows","Rows","5"), P("cols","Cols","5")]),
         CipherEntry("Bifid", Bifid_encode, Bifid_decode, [P("key","Key","KEYWORD"), P("period","Period","5")]),
+        CipherEntry("Twin Bifid", TwinBifid_encode, TwinBifid_decode, [P("key1","Key 1","ALPHA"), P("key2","Key 2","OMEGA"), P("period","Period","5")]),
         CipherEntry("Trifid", Trifid_encode, Trifid_decode, [P("key","Key","KEYWORD"), P("period","Period","5")]),
+        CipherEntry("Trifid Custom Alphabet", TrifidCustom_encode, TrifidCustom_decode, [P("alphabet","Alphabet","ABCDEFGHIJKLMNOPQRSTUVWXYZ."), P("period","Period","5")]),
         CipherEntry("Hill 2x2", Hill2x2_encode, Hill2x2_decode, [P("key","Matrix key","3,3,2,5")]),
+        CipherEntry("Hill 3x3", Hill3x3_encode, Hill3x3_decode, [P("key","Matrix key","6,24,1,13,16,10,20,17,15")]),
+        CipherEntry("Hill NxN", HillNxN_encode, HillNxN_decode, [P("key","Matrix key","6,24,1,13,16,10,20,17,15"), P("size","Size","3"), P("alphabet","Alphabet","ABCDEFGHIJKLMNOPQRSTUVWXYZ")]),
+        CipherEntry("Playfair 6x6", Playfair6x6_encode, Playfair6x6_decode, [P("key","Key","KEYWORD")]),
+        CipherEntry("Four-Square 6x6", FourSquare6x6_encode, FourSquare6x6_decode, [P("key1","Key 1","EXAMPLE"), P("key2","Key 2","KEYWORD")]),
+        CipherEntry("Two-Square 6x6", TwoSquare6x6_encode, TwoSquare6x6_decode, [P("key1","Key L","EXAMPLE"), P("key2","Key R","KEYWORD")]),
+        CipherEntry("Bifid 6x6", Bifid6x6_encode, Bifid6x6_decode, [P("key","Key","KEYWORD"), P("period","Period","5")]),
 
         # ADFGX / ADFGVX
         CipherEntry("ADFGX", ADFGX_encode, ADFGX_decode, [P("square_key","Square Key","KEYWORD"), P("route_key","Route Key","CIPHER")]),
+        CipherEntry("ADFGX Custom Labels", ADFGXCustom_encode, ADFGXCustom_decode, [P("square_key","Square Key","KEYWORD"), P("route_key","Route Key","CIPHER"), P("labels","Labels","ADFGX")]),
         CipherEntry("ADFGVX", ADFGVX_encode, ADFGVX_decode, [P("square_key","Square Key","KEYW0RD"), P("route_key","Route Key","CIPHER")]),
+        CipherEntry("ADFGVX Escaped", ADFGVXEscaped_encode, ADFGVXEscaped_decode, [P("square_key","Square Key","KEYW0RD"), P("route_key","Route Key","CIPHER")]),
 
         # Morse / Pigpen
         CipherEntry("Morse", Morse_encode, Morse_decode, []),
@@ -7949,7 +10037,7 @@ def _score_pt(pt: str) -> float:
         total -= bads * 5.0
         return total
     except Exception:
-        if _old_score_pt: 
+        if _old_score_pt:
             try: return _old_score_pt(pt)
             except Exception: pass
         return 0.0
