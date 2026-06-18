@@ -151,8 +151,8 @@ Telegraph, radio, symbols, and novelty
 137. Zalgo text encoder/cleaner [ADDED]
 138. Invisible Unicode steganography [ADDED]
 139. Zero-width character binary codec [ADDED]
-140. Emoji binary codec variants
-141. Emoji alphabet substitution packs
+140. Emoji binary codec variants [ADDED: Emoji Binary]
+141. Emoji alphabet substitution packs [ADDED: Emoji Alphabet Pack]
 142. Bacon biliteral typography steganography [ADDED: Bacon Biliteral]
 143. Whitespace language-compatible codec [ADDED: Whitespace Binary]
 144. Snow steganography style trailing-space codec [ADDED: Snow Steg]
