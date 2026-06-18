@@ -2,7 +2,7 @@
 #SingleInstance Force
 #UseHook True
 
-; Live Cipher GUI — clean filtered settings + Enigma M3/M4 + more live ciphers
+; Live Cipher GUI — filtered settings + Enigma M3/M4 + expanded live ciphers
 ; Ctrl+Alt+E = Toggle encryption
 ; Ctrl+Alt+R = Reset cipher state
 ; Ctrl+Alt+Q = Quit
@@ -42,6 +42,51 @@ global MODE_LIST := [
     "Polybius square",
     "Tap code",
     "ADFGX",
+    "ADFGVX",
+    "Straddling checkerboard",
+    "Monome-Dinome",
+    "Pollux Morse",
+    "Base64 per letter",
+    "URL percent",
+    "HTML entity",
+    "Unicode code point",
+    "ASCII binary 8-bit",
+    "XOR hex with key",
+    "XOR binary with key",
+    "Braille",
+    "Pigpen symbols",
+    "Emoji alphabet",
+    "Letter index hex",
+    "Roman numerals",
+    "Prime numbers",
+    "Squared A1Z26",
+    "Condi",
+    "Chaocipher",
+    "Playfair pairs",
+    "Hill 2x2 pairs",
+    "Bifid pairs",
+    "Two-square pairs",
+    "Four-square pairs",
+    "Nihilist substitution",
+    "Trifid coordinates",
+    "Checkerboard coordinates",
+    "Baudot ITA2",
+    "Gray code 5-bit",
+    "BCD A1Z26",
+    "Fibonacci numbers",
+    "Triangular numbers",
+    "Cubed A1Z26",
+    "Factorial index",
+    "Modulo 9 index",
+    "Reverse alphabet index",
+    "Keyboard Caesar",
+    "Vowel Caesar",
+    "Consonant Caesar",
+    "Alternating Caesar",
+    "Elder Futhark runes",
+    "Ogham letters",
+    "Semaphore text",
+    "Masonic pigpen variant",
     "Hex ASCII",
     "ASCII decimal",
     "Octal ASCII",
@@ -84,6 +129,12 @@ global outputMode := "Preserve typed case"
 global autoResetOnEnable := true
 global streamIndex := 0
 global autoKeyHistory := ""
+global pairBuffer := ""
+global condiShift := 0
+global chaosLeftDefault := "HXUCZVAMDSLKPEFJRIGTWOBNYQ"
+global chaosRightDefault := "PTLNBQDEOYSFAVZKGJRIHWXUMC"
+global chaosLeft := chaosLeftDefault
+global chaosRight := chaosRightDefault
 
 ; GUI references
 global mainGui := ""
@@ -241,7 +292,7 @@ BuildGui() {
     statusText := mainGui.AddText("xm y692 w980", "")
     stateText := mainGui.AddText("xm y716 w980", "")
     hotkeyText := mainGui.AddText("xm y748 w980", "Hotkeys: Ctrl+Alt+E toggle | Ctrl+Alt+R reset state | Ctrl+Alt+Q quit")
-    noteText := mainGui.AddText("xm y772 w980", "Notes: Random presets generate new settings every time. Morse, Binary, NATO and number modes output multiple characters per typed letter.")
+    noteText := mainGui.AddText("xm y772 w980", "Notes: Random presets generate new settings every time. Some modes output multiple characters per letter. Pair modes such as Playfair, Hill, Bifid, Two-square, and Four-square wait for two letters before output.")
 
     mainGui.OnEvent("Close", (*) => ExitApp())
     mainGui.OnEvent("Size", GuiResized)
@@ -472,6 +523,51 @@ BuildPresetMap() {
     m["Polybius square"] := ["Custom", "Polybius square"]
     m["Tap code"] := ["Custom", "Tap code"]
     m["ADFGX"] := ["Custom", "ADFGX"]
+    m["ADFGVX"] := ["Custom", "ADFGVX"]
+    m["Straddling checkerboard"] := ["Custom", "Straddling checkerboard"]
+    m["Monome-Dinome"] := ["Custom", "Monome-Dinome"]
+    m["Pollux Morse"] := ["Custom", "Pollux Morse — random digits"]
+    m["Base64 per letter"] := ["Custom", "Base64 per letter"]
+    m["URL percent"] := ["Custom", "URL percent"]
+    m["HTML entity"] := ["Custom", "HTML entity"]
+    m["Unicode code point"] := ["Custom", "Unicode code point"]
+    m["ASCII binary 8-bit"] := ["Custom", "ASCII binary 8-bit"]
+    m["XOR hex with key"] := ["Custom", "XOR hex — KEY", "XOR hex — SECRET", "XOR hex — random key"]
+    m["XOR binary with key"] := ["Custom", "XOR binary — KEY", "XOR binary — SECRET", "XOR binary — random key"]
+    m["Braille"] := ["Custom", "Braille"]
+    m["Pigpen symbols"] := ["Custom", "Pigpen symbols"]
+    m["Emoji alphabet"] := ["Custom", "Emoji alphabet"]
+    m["Letter index hex"] := ["Custom", "Letter index hex"]
+    m["Roman numerals"] := ["Custom", "Roman numerals"]
+    m["Prime numbers"] := ["Custom", "Prime numbers"]
+    m["Squared A1Z26"] := ["Custom", "Squared A1Z26"]
+    m["Condi"] := ["Custom", "Condi — CIPHER", "Condi — KEYWORD", "Condi — random key"]
+    m["Chaocipher"] := ["Custom", "Chaocipher default"]
+    m["Playfair pairs"] := ["Custom", "Playfair — MONARCHY", "Playfair — CIPHER", "Playfair — SECRET", "Playfair — random key"]
+    m["Hill 2x2 pairs"] := ["Custom", "Hill 2x2 — fixed matrix"]
+    m["Bifid pairs"] := ["Custom", "Bifid — MONARCHY", "Bifid — CIPHER", "Bifid — SECRET", "Bifid — random key"]
+    m["Two-square pairs"] := ["Custom", "Two-square — CIPHER", "Two-square — MONARCHY", "Two-square — random key"]
+    m["Four-square pairs"] := ["Custom", "Four-square — CIPHER", "Four-square — MONARCHY", "Four-square — random key"]
+    m["Nihilist substitution"] := ["Custom", "Nihilist — CIPHER", "Nihilist — MONARCHY", "Nihilist — random key"]
+    m["Trifid coordinates"] := ["Custom", "Trifid coordinates"]
+    m["Checkerboard coordinates"] := ["Custom", "Checkerboard coordinates"]
+    m["Baudot ITA2"] := ["Custom", "Baudot ITA2"]
+    m["Gray code 5-bit"] := ["Custom", "Gray code 5-bit"]
+    m["BCD A1Z26"] := ["Custom", "BCD A1Z26"]
+    m["Fibonacci numbers"] := ["Custom", "Fibonacci numbers"]
+    m["Triangular numbers"] := ["Custom", "Triangular numbers"]
+    m["Cubed A1Z26"] := ["Custom", "Cubed A1Z26"]
+    m["Factorial index"] := ["Custom", "Factorial index"]
+    m["Modulo 9 index"] := ["Custom", "Modulo 9 index"]
+    m["Reverse alphabet index"] := ["Custom", "Reverse alphabet index"]
+    m["Keyboard Caesar"] := ["Custom", "Keyboard Caesar +1", "Keyboard Caesar +3", "Keyboard Caesar random"]
+    m["Vowel Caesar"] := ["Custom", "Vowel Caesar +1", "Vowel Caesar +2", "Vowel Caesar random"]
+    m["Consonant Caesar"] := ["Custom", "Consonant Caesar +1", "Consonant Caesar +5", "Consonant Caesar random"]
+    m["Alternating Caesar"] := ["Custom", "Alternating Caesar +3", "Alternating Caesar +7", "Alternating Caesar random"]
+    m["Elder Futhark runes"] := ["Custom", "Elder Futhark runes"]
+    m["Ogham letters"] := ["Custom", "Ogham letters"]
+    m["Semaphore text"] := ["Custom", "Semaphore text"]
+    m["Masonic pigpen variant"] := ["Custom", "Masonic pigpen variant"]
     m["Hex ASCII"] := ["Custom", "Hex ASCII"]
     m["ASCII decimal"] := ["Custom", "ASCII decimal"]
     m["Octal ASCII"] := ["Custom", "Octal ASCII"]
@@ -722,6 +818,43 @@ ApplyPreset(preset) {
             affineAEdit.Value := validA[Random(1, validA.Length)]
             affineBEdit.Value := Random(0, 25)
 
+        case "XOR hex — KEY", "XOR binary — KEY":
+            keyEdit.Value := "KEY"
+        case "XOR hex — SECRET", "XOR binary — SECRET":
+            keyEdit.Value := "SECRET"
+        case "XOR hex — random key", "XOR binary — random key":
+            keyEdit.Value := RandomLetters(Random(4, 12))
+        case "Condi — CIPHER", "Playfair — CIPHER":
+            keyEdit.Value := "CIPHER"
+        case "Condi — KEYWORD":
+            keyEdit.Value := "KEYWORD"
+        case "Playfair — MONARCHY":
+            keyEdit.Value := "MONARCHY"
+        case "Playfair — SECRET":
+            keyEdit.Value := "SECRET"
+        case "Condi — random key", "Playfair — random key":
+            keyEdit.Value := RandomLetters(Random(5, 10))
+        case "Bifid — CIPHER", "Two-square — CIPHER", "Four-square — CIPHER", "Nihilist — CIPHER":
+            keyEdit.Value := "CIPHER"
+        case "Bifid — MONARCHY", "Two-square — MONARCHY", "Four-square — MONARCHY", "Nihilist — MONARCHY":
+            keyEdit.Value := "MONARCHY"
+        case "Bifid — SECRET", "Nihilist — SECRET":
+            keyEdit.Value := "SECRET"
+        case "Bifid — random key", "Two-square — random key", "Four-square — random key", "Nihilist — random key":
+            keyEdit.Value := RandomLetters(Random(5, 10))
+        case "Keyboard Caesar +1", "Vowel Caesar +1", "Consonant Caesar +1":
+            shiftEdit.Value := "1"
+        case "Keyboard Caesar +3", "Alternating Caesar +3":
+            shiftEdit.Value := "3"
+        case "Vowel Caesar +2":
+            shiftEdit.Value := "2"
+        case "Consonant Caesar +5":
+            shiftEdit.Value := "5"
+        case "Alternating Caesar +7":
+            shiftEdit.Value := "7"
+        case "Keyboard Caesar random", "Vowel Caesar random", "Consonant Caesar random", "Alternating Caesar random":
+            shiftEdit.Value := Random(-25, 25)
+
         case "Random substitution — random 1", "Random substitution — random 2", "Random substitution — random 3", "Random substitution — random now":
             substitutionEdit.Value := RandomAlphabet()
         case "Random substitution — QWERTY fixed":
@@ -837,12 +970,12 @@ UpdateModePanel() {
             settingHintText.Value := "Enigma M4 settings: thin rotor, three stepping rotors, thin reflector, ring settings, start positions, and plugboard."
         else
             settingHintText.Value := "Enigma M3 settings: three stepping rotors, standard reflector, ring settings, start positions, and plugboard."
-    } else if modeName = "Caesar" || modeName = "Progressive Caesar" || modeName = "Trithemius" {
+    } else if modeName = "Caesar" || modeName = "Progressive Caesar" || modeName = "Trithemius" || modeName = "Keyboard Caesar" || modeName = "Vowel Caesar" || modeName = "Consonant Caesar" || modeName = "Alternating Caesar" {
         SetControlsVisible(caesarPanelControls, true)
         settingHintText.Value := "Shift settings: Caesar uses a fixed shift; Progressive Caesar and Trithemius use this as the starting shift."
-    } else if modeName = "Vigenere" || modeName = "Autokey Vigenere" || modeName = "Gronsfeld" || modeName = "Running Key Vigenere" || modeName = "Beaufort" || modeName = "Variant Beaufort" || modeName = "Porta" || modeName = "Keyword substitution" {
+    } else if modeName = "Vigenere" || modeName = "Autokey Vigenere" || modeName = "Gronsfeld" || modeName = "Running Key Vigenere" || modeName = "Beaufort" || modeName = "Variant Beaufort" || modeName = "Porta" || modeName = "Keyword substitution" || modeName = "XOR hex with key" || modeName = "XOR binary with key" || modeName = "Condi" || modeName = "Playfair pairs" || modeName = "Bifid pairs" || modeName = "Two-square pairs" || modeName = "Four-square pairs" || modeName = "Nihilist substitution" {
         SetControlsVisible(keyPanelControls, true)
-        settingHintText.Value := "Key settings: this cipher only uses the key field. Gronsfeld expects digits; the others expect letters."
+        settingHintText.Value := "Key settings: this cipher only uses the key field. Gronsfeld expects digits; XOR uses the key bytes; the others expect letters."
     } else if modeName = "Affine" {
         SetControlsVisible(affinePanelControls, true)
         settingHintText.Value := "Affine settings: choose a and b."
@@ -931,8 +1064,13 @@ ApplySettingsCore(showTip := true) {
             keyText := "31415"
             keyEdit.Value := keyText
         }
-    } else if modeName = "Vigenere" || modeName = "Autokey Vigenere" || modeName = "Running Key Vigenere" || modeName = "Beaufort" || modeName = "Variant Beaufort" || modeName = "Porta" || modeName = "Keyword substitution" {
+    } else if modeName = "Vigenere" || modeName = "Autokey Vigenere" || modeName = "Running Key Vigenere" || modeName = "Beaufort" || modeName = "Variant Beaufort" || modeName = "Porta" || modeName = "Keyword substitution" || modeName = "Condi" || modeName = "Playfair pairs" || modeName = "Bifid pairs" || modeName = "Two-square pairs" || modeName = "Four-square pairs" || modeName = "Nihilist substitution" {
         if CleanLetters(keyText) = "" {
+            keyText := "KEY"
+            keyEdit.Value := keyText
+        }
+    } else if modeName = "XOR hex with key" || modeName = "XOR binary with key" {
+        if keyText = "" {
             keyText := "KEY"
             keyEdit.Value := keyText
         }
@@ -979,13 +1117,17 @@ ResetStateClicked(*) {
 }
 
 PreviewClicked(*) {
-    global previewInput, previewOutput, rotorPositions, streamIndex, autoKeyHistory
+    global previewInput, previewOutput, rotorPositions, streamIndex, autoKeyHistory, pairBuffer, condiShift, chaosLeft, chaosRight
 
     ApplySettingsCore(false)
 
     savedPositions := rotorPositions.Clone()
     savedStream := streamIndex
     savedHistory := autoKeyHistory
+    savedPairBuffer := pairBuffer
+    savedCondiShift := condiShift
+    savedChaosLeft := chaosLeft
+    savedChaosRight := chaosRight
 
     ResetState()
     text := previewInput.Value
@@ -997,12 +1139,17 @@ PreviewClicked(*) {
         else
             out .= ch
     }
+    out .= FlushPendingByMode()
 
     previewOutput.Value := out
 
     rotorPositions := savedPositions
     streamIndex := savedStream
     autoKeyHistory := savedHistory
+    pairBuffer := savedPairBuffer
+    condiShift := savedCondiShift
+    chaosLeft := savedChaosLeft
+    chaosRight := savedChaosRight
     UpdateStatus()
 }
 
@@ -1025,10 +1172,14 @@ ResetStateFromHotkey() {
 }
 
 ResetState() {
-    global rotorPositions, enigmaStart, streamIndex, autoKeyHistory
+    global rotorPositions, enigmaStart, streamIndex, autoKeyHistory, pairBuffer, condiShift, chaosLeft, chaosRight, chaosLeftDefault, chaosRightDefault
     rotorPositions := StrSplit(enigmaStart)
     streamIndex := 0
     autoKeyHistory := ""
+    pairBuffer := ""
+    condiShift := 0
+    chaosLeft := chaosLeftDefault
+    chaosRight := chaosRightDefault
 }
 
 UpdateStatus() {
@@ -1157,6 +1308,96 @@ EncryptLetterByMode(letter) {
             return TapCodeLetter(letter)
         case "ADFGX":
             return ADFGXLetter(letter)
+        case "ADFGVX":
+            return ADFGVXLetter(letter)
+        case "Straddling checkerboard":
+            return StraddlingCheckerboardLetter(letter)
+        case "Monome-Dinome":
+            return MonomeDinomeLetter(letter)
+        case "Pollux Morse":
+            return PolluxMorseLetter(letter)
+        case "Base64 per letter":
+            return Base64PerLetter(letter)
+        case "URL percent":
+            return UrlPercentLetter(letter)
+        case "HTML entity":
+            return HtmlEntityLetter(letter)
+        case "Unicode code point":
+            return UnicodeCodePointLetter(letter)
+        case "ASCII binary 8-bit":
+            return AsciiBinary8Letter(letter)
+        case "XOR hex with key":
+            return XorHexLetter(letter)
+        case "XOR binary with key":
+            return XorBinaryLetter(letter)
+        case "Braille":
+            return BrailleLetter(letter)
+        case "Pigpen symbols":
+            return PigpenLetter(letter)
+        case "Emoji alphabet":
+            return EmojiLetter(letter)
+        case "Letter index hex":
+            return LetterIndexHexLetter(letter)
+        case "Roman numerals":
+            return RomanNumeralLetter(letter)
+        case "Prime numbers":
+            return PrimeNumberLetter(letter)
+        case "Squared A1Z26":
+            return SquaredA1Z26Letter(letter)
+        case "Condi":
+            return CondiLetter(letter)
+        case "Chaocipher":
+            return ChaocipherLetter(letter)
+        case "Playfair pairs":
+            return PlayfairLetter(letter)
+        case "Hill 2x2 pairs":
+            return Hill2x2Letter(letter)
+        case "Bifid pairs":
+            return BifidLetter(letter)
+        case "Two-square pairs":
+            return TwoSquareLetter(letter)
+        case "Four-square pairs":
+            return FourSquareLetter(letter)
+        case "Nihilist substitution":
+            return NihilistLetter(letter)
+        case "Trifid coordinates":
+            return TrifidCoordinateLetter(letter)
+        case "Checkerboard coordinates":
+            return CheckerboardCoordinateLetter(letter)
+        case "Baudot ITA2":
+            return BaudotLetter(letter)
+        case "Gray code 5-bit":
+            return GrayCode5Letter(letter)
+        case "BCD A1Z26":
+            return BcdA1Z26Letter(letter)
+        case "Fibonacci numbers":
+            return FibonacciNumberLetter(letter)
+        case "Triangular numbers":
+            return TriangularNumberLetter(letter)
+        case "Cubed A1Z26":
+            return CubedA1Z26Letter(letter)
+        case "Factorial index":
+            return FactorialIndexLetter(letter)
+        case "Modulo 9 index":
+            return Modulo9IndexLetter(letter)
+        case "Reverse alphabet index":
+            return ReverseAlphabetIndexLetter(letter)
+        case "Keyboard Caesar":
+            return KeyboardCaesarLetter(letter)
+        case "Vowel Caesar":
+            return VowelCaesarLetter(letter)
+        case "Consonant Caesar":
+            return ConsonantCaesarLetter(letter)
+        case "Alternating Caesar":
+            return AlternatingCaesarLetter(letter)
+        case "Elder Futhark runes":
+            return FutharkLetter(letter)
+        case "Ogham letters":
+            return OghamLetter(letter)
+        case "Semaphore text":
+            return SemaphoreTextLetter(letter)
+        case "Masonic pigpen variant":
+            return MasonicPigpenVariantLetter(letter)
         case "Hex ASCII":
             return HexAsciiLetter(letter)
         case "ASCII decimal":
@@ -1547,6 +1788,599 @@ CyrillicLookalikeLetter(letter) {
     )
     u := StrUpper(letter)
     out := m.Has(u) ? m[u] : letter
+    return out
+}
+
+
+ADFGVXLetter(letter) {
+    u := StrUpper(letter)
+    square := "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    idx := InStr(square, u) - 1
+    if idx < 0
+        return letter
+    labels := "ADFGVX"
+    row := Floor(idx / 6) + 1
+    col := Mod(idx, 6) + 1
+    return SubStr(labels, row, 1) . SubStr(labels, col, 1) . " "
+}
+
+StraddlingCheckerboardLetter(letter) {
+    return CheckerboardNumberLetter(letter, "37")
+}
+
+MonomeDinomeLetter(letter) {
+    return CheckerboardNumberLetter(letter, "26")
+}
+
+CheckerboardNumberLetter(letter, rowDigits) {
+    u := StrUpper(letter)
+    order := "ETAOINSHRDLCUMWFGYPBVKJXQZ"
+    pos := InStr(order, u)
+    if pos <= 0
+        return letter
+    rd1 := SubStr(rowDigits, 1, 1)
+    rd2 := SubStr(rowDigits, 2, 1)
+    topDigits := []
+    Loop 10 {
+        d := A_Index - 1
+        ds := d . ""
+        if ds != rd1 && ds != rd2
+            topDigits.Push(ds)
+    }
+    if pos <= 8
+        return topDigits[pos] . " "
+    pos2 := pos - 9
+    row := Floor(pos2 / 10)
+    col := Mod(pos2, 10)
+    return (row = 0 ? rd1 : rd2) . col . " "
+}
+
+PolluxMorseLetter(letter) {
+    morse := Trim(MorseLetter(letter))
+    if morse = ""
+        return letter
+    dotDigits := ["1", "2", "5"]
+    dashDigits := ["3", "4", "6"]
+    sepDigits := ["7", "8", "9", "0"]
+    out := ""
+    for _, ch in StrSplit(morse) {
+        if ch = "."
+            out .= dotDigits[Random(1, dotDigits.Length)]
+        else if ch = "-"
+            out .= dashDigits[Random(1, dashDigits.Length)]
+    }
+    out .= sepDigits[Random(1, sepDigits.Length)]
+    return out . " "
+}
+
+Base64PerLetter(letter) {
+    b := Ord(letter)
+    alpha := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    i1 := (b >> 2) + 1
+    i2 := ((b & 3) << 4) + 1
+    return SubStr(alpha, i1, 1) . SubStr(alpha, i2, 1) . "== "
+}
+
+UrlPercentLetter(letter) {
+    return "%" . Format("{:02X}", Ord(letter)) . " "
+}
+
+HtmlEntityLetter(letter) {
+    return "&#" . Ord(letter) . "; "
+}
+
+UnicodeCodePointLetter(letter) {
+    return "U+" . Format("{:04X}", Ord(letter)) . " "
+}
+
+AsciiBinary8Letter(letter) {
+    return ByteToBinary8(Ord(letter)) . " "
+}
+
+XorHexLetter(letter) {
+    global keyText, streamIndex
+    kb := XorKeyByte(streamIndex)
+    streamIndex += 1
+    return Format("{:02X}", Ord(letter) ^ kb) . " "
+}
+
+XorBinaryLetter(letter) {
+    global keyText, streamIndex
+    kb := XorKeyByte(streamIndex)
+    streamIndex += 1
+    return ByteToBinary8(Ord(letter) ^ kb) . " "
+}
+
+XorKeyByte(index) {
+    global keyText
+    key := keyText
+    if key = ""
+        key := "KEY"
+    pos := PositiveMod(index, StrLen(key)) + 1
+    return Ord(SubStr(key, pos, 1))
+}
+
+ByteToBinary8(value) {
+    out := ""
+    mask := 128
+    while mask >= 1 {
+        out .= (value & mask) ? "1" : "0"
+        mask := Floor(mask / 2)
+    }
+    return out
+}
+
+BrailleLetter(letter) {
+    patterns := Map(
+        "A",0x2801, "B",0x2803, "C",0x2809, "D",0x2819, "E",0x2811, "F",0x280B, "G",0x281B,
+        "H",0x2813, "I",0x280A, "J",0x281A, "K",0x2805, "L",0x2807, "M",0x280D, "N",0x281D,
+        "O",0x2815, "P",0x280F, "Q",0x281F, "R",0x2817, "S",0x280E, "T",0x281E, "U",0x2825,
+        "V",0x2827, "W",0x283A, "X",0x282D, "Y",0x283D, "Z",0x2835
+    )
+    u := StrUpper(letter)
+    return patterns.Has(u) ? Chr(patterns[u]) : letter
+}
+
+PigpenLetter(letter) {
+    symbols := Map(
+        "A","⌜", "B","⊓", "C","⌝", "D","⊏", "E","□", "F","⊐", "G","⌞", "H","⊔", "I","⌟",
+        "J","⌜·", "K","⊓·", "L","⌝·", "M","⊏·", "N","□·", "O","⊐·", "P","⌞·", "Q","⊔·", "R","⌟·",
+        "S","△", "T","▷", "U","▽", "V","◁", "W","△·", "X","▷·", "Y","▽·", "Z","◁·"
+    )
+    u := StrUpper(letter)
+    return symbols.Has(u) ? symbols[u] . " " : letter
+}
+
+EmojiLetter(letter) {
+    emojis := ["😀","😃","😄","😁","😆","😅","😂","🙂","🙃","😉","😊","😎","🤓","🤠","😺","😸","😹","😻","🐱","🐶","🐼","🦊","🐸","🐵","🐙","⭐"]
+    idx := LetterIndex(StrUpper(letter)) + 1
+    return emojis[idx] . " "
+}
+
+LetterIndexHexLetter(letter) {
+    return Format("{:02X}", LetterIndex(StrUpper(letter)) + 1) . " "
+}
+
+RomanNumeralLetter(letter) {
+    return ToRoman(LetterIndex(StrUpper(letter)) + 1) . " "
+}
+
+PrimeNumberLetter(letter) {
+    primes := [2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101]
+    return primes[LetterIndex(StrUpper(letter)) + 1] . " "
+}
+
+SquaredA1Z26Letter(letter) {
+    n := LetterIndex(StrUpper(letter)) + 1
+    return (n * n) . " "
+}
+
+ToRoman(n) {
+    vals := [10,9,5,4,1]
+    nums := ["X","IX","V","IV","I"]
+    out := ""
+    for i, v in vals {
+        while n >= v {
+            out .= nums[i]
+            n -= v
+        }
+    }
+    return out
+}
+
+CondiLetter(letter) {
+    global keyText, condiShift
+    alpha := KeywordAlphabet(keyText)
+    u := StrUpper(letter)
+    pidx := InStr(alpha, u) - 1
+    if pidx < 0
+        return letter
+    cidx := PositiveMod(pidx + condiShift, 26)
+    mapped := SubStr(alpha, cidx + 1, 1)
+    condiShift := PositiveMod(pidx + 1, 26)
+    return IsUpperLetter(letter) ? mapped : StrLower(mapped)
+}
+
+ChaocipherLetter(letter) {
+    global chaosLeft, chaosRight
+    u := StrUpper(letter)
+    idx := InStr(chaosRight, u)
+    if idx <= 0
+        return letter
+    cipher := SubStr(chaosLeft, idx, 1)
+    StepChaocipher(cipher, u)
+    return IsUpperLetter(letter) ? cipher : StrLower(cipher)
+}
+
+StepChaocipher(cipher, plain) {
+    global chaosLeft, chaosRight
+    cidx := InStr(chaosLeft, cipher)
+    pidx := InStr(chaosRight, plain)
+    chaosLeft := SubStr(chaosLeft, cidx) . SubStr(chaosLeft, 1, cidx - 1)
+    chaosRight := SubStr(chaosRight, pidx) . SubStr(chaosRight, 1, pidx - 1)
+    chaosLeft := SubStr(chaosLeft, 1, 1) . SubStr(chaosLeft, 3, 12) . SubStr(chaosLeft, 2, 1) . SubStr(chaosLeft, 15)
+    chaosRight := SubStr(chaosRight, 1, 2) . SubStr(chaosRight, 4, 11) . SubStr(chaosRight, 3, 1) . SubStr(chaosRight, 15)
+}
+
+PlayfairLetter(letter) {
+    global pairBuffer
+    u := StrUpper(letter)
+    if pairBuffer = "" {
+        pairBuffer := u
+        return ""
+    }
+    a := pairBuffer
+    b := u
+    pairBuffer := ""
+    return PlayfairEncryptPair(a, b, IsUpperLetter(letter))
+}
+
+FlushPendingByMode() {
+    global modeName, pairBuffer
+    if pairBuffer = ""
+        return ""
+    a := pairBuffer
+    pairBuffer := ""
+    switch modeName {
+        case "Playfair pairs":
+            return PlayfairEncryptPair(a, "X", true)
+        case "Hill 2x2 pairs":
+            return Hill2x2EncryptPair(a, "X", true)
+        case "Bifid pairs":
+            return BifidEncryptPair(a, "X", true)
+        case "Two-square pairs":
+            return TwoSquareEncryptPair(a, "X", true)
+        case "Four-square pairs":
+            return FourSquareEncryptPair(a, "X", true)
+    }
+    return ""
+}
+
+PlayfairEncryptPair(a, b, uppercase := true) {
+    global keyText
+    if a = "J"
+        a := "I"
+    if b = "J"
+        b := "I"
+    if a = b
+        b := "X"
+    square := PlayfairSquare(keyText)
+    ia := InStr(square, a) - 1
+    ib := InStr(square, b) - 1
+    ra := Floor(ia / 5), ca := Mod(ia, 5)
+    rb := Floor(ib / 5), cb := Mod(ib, 5)
+    if ra = rb {
+        c1 := SubStr(square, ra * 5 + Mod(ca + 1, 5) + 1, 1)
+        c2 := SubStr(square, rb * 5 + Mod(cb + 1, 5) + 1, 1)
+    } else if ca = cb {
+        c1 := SubStr(square, Mod(ra + 1, 5) * 5 + ca + 1, 1)
+        c2 := SubStr(square, Mod(rb + 1, 5) * 5 + cb + 1, 1)
+    } else {
+        c1 := SubStr(square, ra * 5 + cb + 1, 1)
+        c2 := SubStr(square, rb * 5 + ca + 1, 1)
+    }
+    out := c1 . c2
+    return uppercase ? out : StrLower(out)
+}
+
+PlayfairSquare(key) {
+    clean := StrReplace(CleanLetters(key), "J", "I")
+    base := "ABCDEFGHIKLMNOPQRSTUVWXYZ"
+    out := ""
+    for _, ch in StrSplit(clean . base) {
+        if !InStr(out, ch)
+            out .= ch
+    }
+    return SubStr(out, 1, 25)
+}
+
+
+Hill2x2Letter(letter) {
+    global pairBuffer
+    u := StrUpper(letter)
+    if pairBuffer = "" {
+        pairBuffer := u
+        return ""
+    }
+    a := pairBuffer
+    b := u
+    pairBuffer := ""
+    return Hill2x2EncryptPair(a, b, IsUpperLetter(letter))
+}
+
+Hill2x2EncryptPair(a, b, uppercase := true) {
+    x := LetterIndex(a)
+    y := LetterIndex(b)
+    c1 := PositiveMod(3 * x + 3 * y, 26)
+    c2 := PositiveMod(2 * x + 5 * y, 26)
+    out := LetterFromIndex(c1, true) . LetterFromIndex(c2, true)
+    return uppercase ? out : StrLower(out)
+}
+
+BifidLetter(letter) {
+    global pairBuffer
+    u := StrUpper(letter)
+    if u = "J"
+        u := "I"
+    if pairBuffer = "" {
+        pairBuffer := u
+        return ""
+    }
+    a := pairBuffer
+    b := u
+    pairBuffer := ""
+    return BifidEncryptPair(a, b, IsUpperLetter(letter))
+}
+
+BifidEncryptPair(a, b, uppercase := true) {
+    global keyText
+    square := PlayfairSquare(keyText)
+    if a = "J"
+        a := "I"
+    if b = "J"
+        b := "I"
+    ia := InStr(square, a) - 1
+    ib := InStr(square, b) - 1
+    ra := Floor(ia / 5), ca := Mod(ia, 5)
+    rb := Floor(ib / 5), cb := Mod(ib, 5)
+    c1 := SubStr(square, ra * 5 + rb + 1, 1)
+    c2 := SubStr(square, ca * 5 + cb + 1, 1)
+    out := c1 . c2
+    return uppercase ? out : StrLower(out)
+}
+
+TwoSquareLetter(letter) {
+    global pairBuffer
+    u := StrUpper(letter)
+    if u = "J"
+        u := "I"
+    if pairBuffer = "" {
+        pairBuffer := u
+        return ""
+    }
+    a := pairBuffer
+    b := u
+    pairBuffer := ""
+    return TwoSquareEncryptPair(a, b, IsUpperLetter(letter))
+}
+
+TwoSquareEncryptPair(a, b, uppercase := true) {
+    global keyText
+    leftSquare := PlayfairSquare(keyText)
+    rightSquare := PlayfairSquare("SQUARE" . keyText)
+    if a = "J"
+        a := "I"
+    if b = "J"
+        b := "I"
+    ia := InStr(leftSquare, a) - 1
+    ib := InStr(rightSquare, b) - 1
+    ra := Floor(ia / 5), ca := Mod(ia, 5)
+    rb := Floor(ib / 5), cb := Mod(ib, 5)
+    if ra = rb {
+        c1 := a
+        c2 := b
+    } else {
+        c1 := SubStr(leftSquare, ra * 5 + cb + 1, 1)
+        c2 := SubStr(rightSquare, rb * 5 + ca + 1, 1)
+    }
+    out := c1 . c2
+    return uppercase ? out : StrLower(out)
+}
+
+FourSquareLetter(letter) {
+    global pairBuffer
+    u := StrUpper(letter)
+    if u = "J"
+        u := "I"
+    if pairBuffer = "" {
+        pairBuffer := u
+        return ""
+    }
+    a := pairBuffer
+    b := u
+    pairBuffer := ""
+    return FourSquareEncryptPair(a, b, IsUpperLetter(letter))
+}
+
+FourSquareEncryptPair(a, b, uppercase := true) {
+    global keyText
+    plainSquare := "ABCDEFGHIKLMNOPQRSTUVWXYZ"
+    topRight := PlayfairSquare(keyText)
+    bottomLeft := PlayfairSquare("FOUR" . keyText)
+    if a = "J"
+        a := "I"
+    if b = "J"
+        b := "I"
+    ia := InStr(plainSquare, a) - 1
+    ib := InStr(plainSquare, b) - 1
+    ra := Floor(ia / 5), ca := Mod(ia, 5)
+    rb := Floor(ib / 5), cb := Mod(ib, 5)
+    c1 := SubStr(topRight, ra * 5 + cb + 1, 1)
+    c2 := SubStr(bottomLeft, rb * 5 + ca + 1, 1)
+    out := c1 . c2
+    return uppercase ? out : StrLower(out)
+}
+
+NihilistLetter(letter) {
+    global keyText, streamIndex
+    u := StrUpper(letter)
+    if u = "J"
+        u := "I"
+    p := PolybiusNumberForLetter(u)
+    kshift := KeyShiftAt(keyText, streamIndex)
+    streamIndex += 1
+    kletter := LetterFromIndex(kshift, true)
+    if kletter = "J"
+        kletter := "I"
+    k := PolybiusNumberForLetter(kletter)
+    return (p + k) . " "
+}
+
+PolybiusNumberForLetter(u) {
+    if u = "J"
+        u := "I"
+    square := "ABCDEFGHIKLMNOPQRSTUVWXYZ"
+    idx := InStr(square, u) - 1
+    row := Floor(idx / 5) + 1
+    col := Mod(idx, 5) + 1
+    return (row * 10) + col
+}
+
+TrifidCoordinateLetter(letter) {
+    cube := "ABCDEFGHIJKLMNOPQRSTUVWXYZ."
+    u := StrUpper(letter)
+    idx := InStr(cube, u) - 1
+    if idx < 0
+        return letter
+    layer := Floor(idx / 9) + 1
+    rem := Mod(idx, 9)
+    row := Floor(rem / 3) + 1
+    col := Mod(rem, 3) + 1
+    return layer . row . col . " "
+}
+
+CheckerboardCoordinateLetter(letter) {
+    idx := LetterIndex(StrUpper(letter))
+    row := Floor(idx / 6) + 1
+    col := Mod(idx, 6) + 1
+    return row . "," . col . " "
+}
+
+BaudotLetter(letter) {
+    u := StrUpper(letter)
+    codes := Map(
+        "A","00011", "B","11001", "C","01110", "D","01001", "E","00001", "F","01101",
+        "G","11010", "H","10100", "I","00110", "J","01011", "K","01111", "L","10010",
+        "M","11100", "N","01100", "O","11000", "P","10110", "Q","10111", "R","01010",
+        "S","00101", "T","10000", "U","00111", "V","11110", "W","10011", "X","11101",
+        "Y","10101", "Z","10001"
+    )
+    return codes.Has(u) ? codes[u] . " " : letter
+}
+
+GrayCode5Letter(letter) {
+    n := LetterIndex(StrUpper(letter)) + 1
+    g := n ^ (n >> 1)
+    return ToBinaryWidth(g, 5) . " "
+}
+
+BcdA1Z26Letter(letter) {
+    n := LetterIndex(StrUpper(letter)) + 1
+    tens := Floor(n / 10)
+    ones := Mod(n, 10)
+    return ToBinaryWidth(tens, 4) . " " . ToBinaryWidth(ones, 4) . " "
+}
+
+FibonacciNumberLetter(letter) {
+    fib := [1,1,2,3,5,8,13,21,34,55,89,144,233,377,610,987,1597,2584,4181,6765,10946,17711,28657,46368,75025,121393]
+    return fib[LetterIndex(StrUpper(letter)) + 1] . " "
+}
+
+TriangularNumberLetter(letter) {
+    n := LetterIndex(StrUpper(letter)) + 1
+    return Floor(n * (n + 1) / 2) . " "
+}
+
+CubedA1Z26Letter(letter) {
+    n := LetterIndex(StrUpper(letter)) + 1
+    return (n * n * n) . " "
+}
+
+FactorialIndexLetter(letter) {
+    facts := ["1","2","6","24","120","720","5040","40320","362880","3628800","39916800","479001600","6227020800","87178291200","1307674368000","20922789888000","355687428096000","6402373705728000","121645100408832000","2432902008176640000","51090942171709440000","1124000727777607680000","25852016738884976640000","620448401733239439360000","15511210043330985984000000","403291461126605635584000000"]
+    return facts[LetterIndex(StrUpper(letter)) + 1] . " "
+}
+
+Modulo9IndexLetter(letter) {
+    n := LetterIndex(StrUpper(letter)) + 1
+    r := Mod(n, 9)
+    if r = 0
+        r := 9
+    return r . " "
+}
+
+ReverseAlphabetIndexLetter(letter) {
+    return (26 - LetterIndex(StrUpper(letter))) . " "
+}
+
+KeyboardCaesarLetter(letter) {
+    global shiftValue
+    keys := "QWERTYUIOPASDFGHJKLZXCVBNM"
+    u := StrUpper(letter)
+    idx := InStr(keys, u) - 1
+    if idx < 0
+        return letter
+    mapped := SubStr(keys, PositiveMod(idx + shiftValue, 26) + 1, 1)
+    return IsUpperLetter(letter) ? mapped : StrLower(mapped)
+}
+
+VowelCaesarLetter(letter) {
+    global shiftValue
+    vowels := "AEIOU"
+    u := StrUpper(letter)
+    idx := InStr(vowels, u) - 1
+    if idx < 0
+        return letter
+    mapped := SubStr(vowels, PositiveMod(idx + shiftValue, 5) + 1, 1)
+    return IsUpperLetter(letter) ? mapped : StrLower(mapped)
+}
+
+ConsonantCaesarLetter(letter) {
+    global shiftValue
+    cons := "BCDFGHJKLMNPQRSTVWXYZ"
+    u := StrUpper(letter)
+    idx := InStr(cons, u) - 1
+    if idx < 0
+        return letter
+    mapped := SubStr(cons, PositiveMod(idx + shiftValue, 21) + 1, 1)
+    return IsUpperLetter(letter) ? mapped : StrLower(mapped)
+}
+
+AlternatingCaesarLetter(letter) {
+    global shiftValue, streamIndex
+    shift := (Mod(streamIndex, 2) = 0) ? shiftValue : -shiftValue
+    streamIndex += 1
+    return ShiftLetter(letter, shift)
+}
+
+FutharkLetter(letter) {
+    runes := ["ᚠ","ᚢ","ᚦ","ᚨ","ᚱ","ᚲ","ᚷ","ᚹ","ᚺ","ᚾ","ᛁ","ᛃ","ᛇ","ᛈ","ᛉ","ᛊ","ᛏ","ᛒ","ᛖ","ᛗ","ᛚ","ᛜ","ᛞ","ᛟ","ᚡ","ᛦ"]
+    return runes[LetterIndex(StrUpper(letter)) + 1] . " "
+}
+
+OghamLetter(letter) {
+    ogham := ["ᚐ","ᚁ","ᚉ","ᚇ","ᚓ","ᚃ","ᚌ","ᚆ","ᚔ","ᚊ","ᚕ","ᚂ","ᚋ","ᚅ","ᚑ","ᚚ","ᚊ","ᚏ","ᚄ","ᚈ","ᚒ","ᚃ","ᚃ","ᚎ","ᚔ","ᚎ"]
+    return ogham[LetterIndex(StrUpper(letter)) + 1] . " "
+}
+
+SemaphoreTextLetter(letter) {
+    sem := Map(
+        "A","down-left + down", "B","down-left + down-right", "C","down-left + right", "D","down-left + up-right", "E","down-left + up", "F","down-left + up-left", "G","down + down-right",
+        "H","down + right", "I","down + up-right", "J","right + up", "K","down + up", "L","down + up-left", "M","down-right + right", "N","down-right + up-right",
+        "O","down-right + up", "P","down-right + up-left", "Q","right + up-right", "R","right + up", "S","right + up-left", "T","up-right + up", "U","up-right + up-left",
+        "V","up + up-left", "W","down + left", "X","down-right + left", "Y","right + left", "Z","up-right + left"
+    )
+    u := StrUpper(letter)
+    return sem.Has(u) ? "[" . sem[u] . "] " : letter
+}
+
+MasonicPigpenVariantLetter(letter) {
+    symbols := Map(
+        "A","□1", "B","□2", "C","□3", "D","□4", "E","□5", "F","□6", "G","□7", "H","□8", "I","□9",
+        "J","□1·", "K","□2·", "L","□3·", "M","□4·", "N","□5·", "O","□6·", "P","□7·", "Q","□8·", "R","□9·",
+        "S","◇1", "T","◇2", "U","◇3", "V","◇4", "W","◇1·", "X","◇2·", "Y","◇3·", "Z","◇4·"
+    )
+    u := StrUpper(letter)
+    return symbols.Has(u) ? symbols[u] . " " : letter
+}
+
+ToBinaryWidth(value, width) {
+    out := ""
+    mask := 1 << (width - 1)
+    while mask >= 1 {
+        out .= (value & mask) ? "1" : "0"
+        mask := mask >> 1
+    }
     return out
 }
 
