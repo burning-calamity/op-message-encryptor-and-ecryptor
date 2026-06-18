@@ -244,7 +244,7 @@ Hashing, checksums, and KDF helpers
 
 Modern symmetric ciphers / modes
 --------------------------------
-224. AES-ECB/CBC/CTR/GCM wrappers (optional dependency) [ADDED: AES-GCM]
+224. AES-ECB/CBC/CTR/GCM wrappers (optional dependency) [ADDED: AES-ECB/CBC/CTR/GCM]
 224a. Fernet authenticated encryption tokens (optional dependency) [ADDED: Fernet Token]
 225. AES-SIV wrapper
 226. AES-KW key wrap

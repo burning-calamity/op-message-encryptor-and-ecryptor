@@ -6964,6 +6964,85 @@ def AESGCM_hex_decode(text: str, key: str = "secret", nonce: str = "nonce", aad:
     plain = AESGCM(_aead_key(key)).decrypt(_nonce_bytes(str(nonce), 12), bytes.fromhex(body), (aad or "").encode("utf-8"))
     return plain.decode("utf-8")
 
+def _aes_cipher(key: str, mode_obj):
+    if importlib.util.find_spec("cryptography") is None:
+        return None
+    ciphers = importlib.import_module("cryptography.hazmat.primitives.ciphers")
+    return ciphers.Cipher(ciphers.algorithms.AES(_aead_key(key)), mode_obj)
+
+def _pkcs7_pad(data: bytes, block: int = 16) -> bytes:
+    pad = block - (len(data) % block)
+    return data + bytes([pad]) * pad
+
+def _pkcs7_unpad(data: bytes) -> bytes:
+    if not data:
+        return data
+    pad = data[-1]
+    if pad < 1 or pad > 16 or data[-pad:] != bytes([pad]) * pad:
+        return data
+    return data[:-pad]
+
+def AESECB_hex_encode(text: str, key: str = "secret") -> str:
+    if importlib.util.find_spec("cryptography") is None:
+        return _cryptography_missing("AES-ECB")
+    modes = importlib.import_module("cryptography.hazmat.primitives.ciphers.modes")
+    enc = _aes_cipher(key, modes.ECB()).encryptor()
+    return "[AESECB]|" + (enc.update(_pkcs7_pad(text.encode("utf-8"))) + enc.finalize()).hex()
+
+def AESECB_hex_decode(text: str, key: str = "secret") -> str:
+    if importlib.util.find_spec("cryptography") is None:
+        return _cryptography_missing("AES-ECB")
+    modes = importlib.import_module("cryptography.hazmat.primitives.ciphers.modes")
+    body = text.split("|", 1)[1] if text.startswith("[AESECB]|") else text
+    dec = _aes_cipher(key, modes.ECB()).decryptor()
+    plain = _pkcs7_unpad(dec.update(bytes.fromhex(body.strip())) + dec.finalize())
+    return plain.decode("utf-8")
+
+def AESCBC_hex_encode(text: str, key: str = "secret", iv: str = "iv") -> str:
+    if importlib.util.find_spec("cryptography") is None:
+        return _cryptography_missing("AES-CBC")
+    modes = importlib.import_module("cryptography.hazmat.primitives.ciphers.modes")
+    iv_bytes = _nonce_bytes(iv, 16)
+    enc = _aes_cipher(key, modes.CBC(iv_bytes)).encryptor()
+    cipher = enc.update(_pkcs7_pad(text.encode("utf-8"))) + enc.finalize()
+    return "[AESCBC]" + json.dumps({"iv": iv_bytes.hex()}, separators=(",", ":")) + "|" + cipher.hex()
+
+def AESCBC_hex_decode(text: str, key: str = "secret", iv: str = "iv") -> str:
+    if importlib.util.find_spec("cryptography") is None:
+        return _cryptography_missing("AES-CBC")
+    modes = importlib.import_module("cryptography.hazmat.primitives.ciphers.modes")
+    body = text.strip()
+    if body.startswith("[AESCBC]"):
+        meta_end = body.index("|", len("[AESCBC]"))
+        meta = json.loads(body[len("[AESCBC]"):meta_end])
+        iv = meta.get("iv", iv)
+        body = body[meta_end+1:]
+    dec = _aes_cipher(key, modes.CBC(_nonce_bytes(str(iv), 16))).decryptor()
+    plain = _pkcs7_unpad(dec.update(bytes.fromhex(body)) + dec.finalize())
+    return plain.decode("utf-8")
+
+def AESCTR_hex_encode(text: str, key: str = "secret", nonce: str = "nonce") -> str:
+    if importlib.util.find_spec("cryptography") is None:
+        return _cryptography_missing("AES-CTR")
+    modes = importlib.import_module("cryptography.hazmat.primitives.ciphers.modes")
+    nonce_bytes = _nonce_bytes(nonce, 16)
+    enc = _aes_cipher(key, modes.CTR(nonce_bytes)).encryptor()
+    cipher = enc.update(text.encode("utf-8")) + enc.finalize()
+    return "[AESCTR]" + json.dumps({"nonce": nonce_bytes.hex()}, separators=(",", ":")) + "|" + cipher.hex()
+
+def AESCTR_hex_decode(text: str, key: str = "secret", nonce: str = "nonce") -> str:
+    if importlib.util.find_spec("cryptography") is None:
+        return _cryptography_missing("AES-CTR")
+    modes = importlib.import_module("cryptography.hazmat.primitives.ciphers.modes")
+    body = text.strip()
+    if body.startswith("[AESCTR]"):
+        meta_end = body.index("|", len("[AESCTR]"))
+        meta = json.loads(body[len("[AESCTR]"):meta_end])
+        nonce = meta.get("nonce", nonce)
+        body = body[meta_end+1:]
+    dec = _aes_cipher(key, modes.CTR(_nonce_bytes(str(nonce), 16))).decryptor()
+    return (dec.update(bytes.fromhex(body)) + dec.finalize()).decode("utf-8")
+
 def ChaCha20Poly1305_hex_encode(text: str, key: str = "secret", nonce: str = "nonce", aad: str = "") -> str:
     if importlib.util.find_spec("cryptography") is None:
         return _cryptography_missing("ChaCha20-Poly1305")
@@ -9018,6 +9097,9 @@ def get_registry() -> List[CipherEntry]:
         CipherEntry("Solitaire", Solitaire_encode, Solitaire_decode, [P("key","Key","CRYPTONOMICON")]),
         CipherEntry("ChaCha20 (hex)", ChaCha20_hex_encode, ChaCha20_hex_decode, [P("key","Key","secret"), P("nonce","Nonce","000000000000000000000000"), P("counter","Counter","1")]),
         CipherEntry("AES-GCM (hex)", AESGCM_hex_encode, AESGCM_hex_decode, [P("key","Key/hex key","secret"), P("nonce","Nonce/hex nonce","nonce"), P("aad","AAD","")]),
+        CipherEntry("AES-ECB (hex)", AESECB_hex_encode, AESECB_hex_decode, [P("key","Key/hex key","secret")]),
+        CipherEntry("AES-CBC (hex)", AESCBC_hex_encode, AESCBC_hex_decode, [P("key","Key/hex key","secret"), P("iv","IV/hex IV","iv")]),
+        CipherEntry("AES-CTR (hex)", AESCTR_hex_encode, AESCTR_hex_decode, [P("key","Key/hex key","secret"), P("nonce","Nonce/hex nonce","nonce")]),
         CipherEntry("ChaCha20-Poly1305 (hex)", ChaCha20Poly1305_hex_encode, ChaCha20Poly1305_hex_decode, [P("key","Key/hex key","secret"), P("nonce","Nonce/hex nonce","nonce"), P("aad","AAD","")]),
         CipherEntry("Fernet Token", FernetToken_encode, FernetToken_decode, [P("password","Password","secret")]),
         CipherEntry("ChaCha12 (hex)", ChaCha12_hex_encode, ChaCha12_hex_decode, [P("key","Key","secret"), P("nonce","Nonce","000000000000000000000000"), P("counter","Counter","1")]),
