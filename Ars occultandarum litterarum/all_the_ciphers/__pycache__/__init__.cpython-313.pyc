@@ -1,0 +1,69 @@
+ 
+    }G4j                       |     S r SSKJr  SSKJrJrJrJ r JrJ	r	J
+r
+  Sr
+S
+S jrSS  jr
+SS jrSS	 jrSS
+ jrSSS jjrg
+)z All The Ciphers Python library.
+
+Import this package to encode, decode, guess, and brute-force many classical
+ciphers and encodings.
+     ) 
+annotations    )  
+CipherEntry Param 
+BruteForce 
+SmartGuess 
+call_decode 
+call_encode get_registryz2.1.0c                  T     [        5        V s/ s H  o R                  PM  
+   sn $ s  sn f )z"Return all available cipher names.)r
+    name) entrys     =/mnt/data/all_the_ciphers_library/all_the_ciphers/__init__.py list_ciphersr      s      $0 N 
+3 N 5 J J N 
+3 3  
+3s    %c                      U R                  5       n[        5        H%  nUR                  R                  5       U:X  d  M#  Us  $ 
+   [         SU  35      e)z9Return a cipher registry entry by name, case-insensitive.zUnknown cipher: ) casefoldr
+   r
+    
+ValueError)r
+    wantedr   s      r    
+get_cipherr      sH      
+ ] ] _ F    
+ : : 
+ 
+ 
+  F 
+*  L     
+ '  v . 
+/ /     c              
+        [        XUR                  5        VVs0 s H  u  p4U[        U5      _M  
+   snn5      $ s  snnf )zREncode text with a named cipher.
+
+Example:
+    encode("Caesar", "HELLO", shift=3)
+)r
+    items str  cipher text params k vs        r    encoder    #    3        v F L L N %K N D A a  Q  i N %K 
+L L  %K     :c              
+        [        XUR                  5        VVs0 s H  u  p4U[        U5      _M  
+   snn5      $ s  snnf )zRDecode text with a named cipher.
+
+Example:
+    decode("Caesar", "KHOOR", shift=3)
+)r	   r   r   r   s        r    decoder$   ,   r!   r"   c                      [        U 5      $ )z$Return ranked SmartGuess candidates.)r   )r   s    r    
+smart_guessr&   5   s
+      
+ d 
+ r   Nc                      [        X5      $ )z%Return ranked brute-force candidates.)r    )r    familiess     r    
+brute_forcer)   :   s
+      
+ d 
+% %r   ) returnz	list[str])r
+   r   r*   r   )r   r   r   r   r    objectr*   r   )r   r   )N)r   r   r(   zlist[str] | None)  __doc__ 
+__future__r    corer   r   r    r   r	   r
+   r
+    
+__version__r   r   r    r$   r&   r)     r   r    <module>r1      sE      
+ #        
+ 4 
+0 M M  
+&r   
