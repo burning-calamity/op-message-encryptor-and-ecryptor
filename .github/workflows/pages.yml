@@ -1,0 +1,3 @@
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
