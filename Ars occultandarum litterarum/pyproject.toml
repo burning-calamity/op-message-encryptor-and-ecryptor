@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "all-the-ciphers"
+version = "2.1.0"
+description = "A Python library and CLI for classical ciphers, encodings, SmartGuess, and brute force helpers."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Your Name"}]
+keywords = ["cipher", "cryptography", "classical-ciphers", "encoding", "enigma"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+]
+
+[project.scripts]
+encripter = "all_the_ciphers.core:cli_main"
+all-the-ciphers = "all_the_ciphers.core:cli_main"
+
+[tool.setuptools.packages.find]
+include = ["all_the_ciphers*"]
