@@ -151,8 +151,8 @@ Telegraph, radio, symbols, and novelty
 137. Zalgo text encoder/cleaner [ADDED]
 138. Invisible Unicode steganography [ADDED]
 139. Zero-width character binary codec [ADDED]
-140. Emoji binary codec variants [ADDED: Emoji Binary]
-141. Emoji alphabet substitution packs [ADDED: Emoji Alphabet Pack]
+140. Emoji binary codec variants
+141. Emoji alphabet substitution packs
 142. Bacon biliteral typography steganography [ADDED: Bacon Biliteral]
 143. Whitespace language-compatible codec [ADDED: Whitespace Binary]
 144. Snow steganography style trailing-space codec [ADDED: Snow Steg]
@@ -244,7 +244,8 @@ Hashing, checksums, and KDF helpers
 
 Modern symmetric ciphers / modes
 --------------------------------
-224. AES-ECB/CBC/CTR/GCM wrappers (optional dependency)
+224. AES-ECB/CBC/CTR/GCM wrappers (optional dependency) [ADDED: AES-GCM]
+224a. Fernet authenticated encryption tokens (optional dependency) [ADDED: Fernet Token]
 225. AES-SIV wrapper
 226. AES-KW key wrap
 227. DES/3DES educational wrappers
@@ -300,7 +301,7 @@ Modern symmetric ciphers / modes
 277. Salsa20/8 and Salsa20/12
 278. XSalsa20
 279. XChaCha20
-280. ChaCha20-Poly1305 tagged AEAD
+280. ChaCha20-Poly1305 tagged AEAD [ADDED]
 281. XChaCha20-Poly1305 tagged AEAD
 282. Poly1305 MAC helper
 283. OCB mode wrapper
@@ -362,11 +363,11 @@ Steganography and puzzle helpers
 333. Barcode Code 39/128 codec
 334. Color square / RGB triplet codec
 335. Hex color text codec [ADDED]
-336. DNA codon codec
-337. RNA codon codec
-338. Amino-acid one/three-letter codec
-339. I Ching hexagram binary codec
-340. Tarot-card substitution codec
+336. DNA codon codec [ADDED: DNA Codons]
+337. RNA codon codec [ADDED: RNA Codons]
+338. Amino-acid one/three-letter codec [ADDED: Amino Acid 1/3]
+339. I Ching hexagram binary codec [ADDED: I Ching Hexagrams]
+340. Tarot-card substitution codec [ADDED: Tarot Cards]
 
 Analysis and brute-force helpers to pair with additions
 -------------------------------------------------------

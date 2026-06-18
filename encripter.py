@@ -23,6 +23,8 @@ import html
 import hashlib
 import gzip
 import hmac
+import importlib
+import importlib.util
 import json
 import math
 import quopri
@@ -5631,42 +5633,6 @@ def _uleb128_decode_bytes(data: List[int]) -> List[int]:
         raise ValueError("unterminated LEB128 value")
     return values
 
-def _sleb128_encode_int(n: int) -> List[int]:
-    if not -128 <= n <= 127:
-        raise ValueError("SLEB128 byte codec only accepts signed byte values")
-    out = []
-    value = n
-    while True:
-        byte = value & 0x7f
-        sign_bit = byte & 0x40
-        value >>= 7
-        done = (value == 0 and not sign_bit) or (value == -1 and sign_bit)
-        if not done:
-            byte |= 0x80
-        out.append(byte)
-        if done:
-            return out
-
-def _sleb128_decode_bytes(data: List[int]) -> List[int]:
-    values = []
-    value = 0
-    shift = 0
-    for byte in data:
-        value |= (byte & 0x7f) << shift
-        shift += 7
-        if byte & 0x80:
-            if shift > 35:
-                raise ValueError("SLEB128 value too large for byte codec")
-            continue
-        if byte & 0x40:
-            value |= -(1 << shift)
-        values.append(value)
-        value = 0
-        shift = 0
-    if shift:
-        raise ValueError("unterminated SLEB128 value")
-    return values
-
 def LEB128_encode(text: str) -> str:
     encoded = []
     for byte in text.encode("utf-8"):
@@ -5681,24 +5647,6 @@ def LEB128_decode(text: str) -> str:
         if any(not 0 <= value <= 255 for value in values):
             return "Err:LEB128 decoded value outside byte range"
         return bytes(values).decode("utf-8")
-    except Exception as e:
-        return f"Err:{e}"
-
-def SLEB128_encode(text: str) -> str:
-    encoded = []
-    for byte in text.encode("utf-8"):
-        encoded.extend(_sleb128_encode_int(byte - 128))
-    return " ".join(f"{byte:02X}" for byte in encoded)
-
-def SLEB128_decode(text: str) -> str:
-    try:
-        compact = text.replace("0x", "").replace(",", " ")
-        data = [int(part, 16) for part in compact.split()] if compact.strip() else []
-        values = _sleb128_decode_bytes(data)
-        translated = [value + 128 for value in values]
-        if any(not 0 <= value <= 255 for value in translated):
-            return "Err:SLEB128 decoded value outside byte range"
-        return bytes(translated).decode("utf-8")
     except Exception as e:
         return f"Err:{e}"
 
@@ -5795,61 +5743,6 @@ def Golomb_decode(text: str, m: int | str = 10) -> str:
     except Exception as e:
         return f"Err:{e}"
 
-def _int_to_exp_golomb(n: int, k: int) -> str:
-    if n < 0 or k < 0:
-        raise ValueError("Exp-Golomb coding requires n >= 0 and k >= 0")
-    q = (n >> k) + 1
-    prefix = _int_to_elias_gamma(q)
-    suffix = format(n & ((1 << k) - 1), f"0{k}b") if k else ""
-    return prefix + suffix
-
-def _exp_golomb_to_int(bits: str, k: int) -> int:
-    if not bits or set(bits) - {"0", "1"} or k < 0:
-        raise ValueError("invalid Exp-Golomb token")
-    zeros = len(bits) - len(bits.lstrip("0"))
-    gamma_len = zeros * 2 + 1
-    if len(bits) != gamma_len + k:
-        raise ValueError("invalid Exp-Golomb token length")
-    q = _elias_gamma_to_int(bits[:gamma_len])
-    suffix = int(bits[gamma_len:] or "0", 2)
-    return ((q - 1) << k) | suffix
-
-def ExpGolomb_encode(text: str, k: int | str = 0) -> str:
-    k = int(k)
-    return " ".join(_int_to_exp_golomb(byte, k) for byte in text.encode("utf-8"))
-
-def ExpGolomb_decode(text: str, k: int | str = 0) -> str:
-    try:
-        k = int(k)
-        if not text.strip():
-            return ""
-        values = [_exp_golomb_to_int(token, k) for token in text.split()]
-        if any(not 0 <= value <= 255 for value in values):
-            return "Err:Exp-Golomb decoded value outside byte range"
-        return bytes(values).decode("utf-8")
-    except Exception as e:
-        return f"Err:{e}"
-
-def Rice_encode(text: str, k: int | str = 3) -> str:
-    k = int(k)
-    m = 1 << k
-    return " ".join(_int_to_golomb(byte, m) for byte in text.encode("utf-8"))
-
-def Rice_decode(text: str, k: int | str = 3) -> str:
-    try:
-        k = int(k)
-        if k < 0:
-            raise ValueError("Rice parameter k must be non-negative")
-        m = 1 << k
-        if not text.strip():
-            return ""
-        values = [_golomb_to_int(token, m) for token in text.split()]
-        if any(not 0 <= value <= 255 for value in values):
-            return "Err:Rice decoded value outside byte range"
-        return bytes(values).decode("utf-8")
-    except Exception as e:
-        return f"Err:{e}"
-
 def CRC8_encode(text: str) -> str:
     crc = 0
     for byte in text.encode("utf-8"):
@@ -5895,36 +5788,6 @@ def CRC64ECMA_decode(text: str) -> str:
         actual = _crc64_ecma(body.encode("utf-8"))
         if actual != expected:
             return f"Err:CRC64-ECMA mismatch expected {expected:016X} got {actual:016X}"
-        return body
-    except Exception as e:
-        return f"Err:{e}"
-
-def _crc24_openpgp(data: bytes) -> int:
-    crc = 0xB704CE
-    poly = 0x1864CFB
-    for byte in data:
-        crc ^= byte << 16
-        for _ in range(8):
-            crc <<= 1
-            if crc & 0x1000000:
-                crc ^= poly
-            crc &= 0xFFFFFF
-    return crc
-
-def CRC24OpenPGP_encode(text: str) -> str:
-    crc = _crc24_openpgp(text.encode("utf-8"))
-    return f"[CRC24-OPENPGP]{crc:06X}|{text}"
-
-def CRC24OpenPGP_decode(text: str) -> str:
-    try:
-        if not text.startswith("[CRC24-OPENPGP]"):
-            return "Err:bad CRC24-OPENPGP format"
-        sep = text.index("|", len("[CRC24-OPENPGP]"))
-        expected = int(text[len("[CRC24-OPENPGP]"):sep], 16)
-        body = text[sep+1:]
-        actual = _crc24_openpgp(body.encode("utf-8"))
-        if actual != expected:
-            return f"Err:CRC24-OPENPGP mismatch expected {expected:06X} got {actual:06X}"
         return body
     except Exception as e:
         return f"Err:{e}"
@@ -6224,6 +6087,143 @@ def DNA_decode(text: str) -> str:
         bits = bits[:len(bits) - (len(bits) % 8)]
     data = bytes(int(bits[i:i+8], 2) for i in range(0, len(bits), 8))
     return data.decode("utf-8", errors="replace")
+
+_CODON_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,!?;:-_/@#$%&*+=()[]{}"
+_DNA_BASES = "ACGT"
+_RNA_BASES = "ACGU"
+
+def _codon_table(bases: str) -> Dict[str, str]:
+    return {ch: bases[(i >> 4) & 3] + bases[(i >> 2) & 3] + bases[i & 3] for i, ch in enumerate(_CODON_ALPHABET)}
+
+def _codon_rev(bases: str) -> Dict[str, str]:
+    table = _codon_table(bases)
+    return {v: k for k, v in table.items()}
+
+def DNACodon_encode(text: str) -> str:
+    table = _codon_table(_DNA_BASES)
+    return " ".join(table.get(ch.upper(), ch) for ch in text)
+
+def DNACodon_decode(text: str) -> str:
+    rev = _codon_rev(_DNA_BASES)
+    out = []
+    for tok in re.findall(r"[ACGTacgt]{3}|.", text):
+        up = tok.upper()
+        if up in rev:
+            out.append(rev[up])
+        elif tok.isspace():
+            continue
+        else:
+            out.append(tok)
+    return "".join(out).lower()
+
+def RNACodon_encode(text: str) -> str:
+    table = _codon_table(_RNA_BASES)
+    return " ".join(table.get(ch.upper(), ch) for ch in text)
+
+def RNACodon_decode(text: str) -> str:
+    rev = _codon_rev(_RNA_BASES)
+    out = []
+    for tok in re.findall(r"[ACGUacgu]{3}|.", text):
+        up = tok.upper()
+        if up in rev:
+            out.append(rev[up])
+        elif tok.isspace():
+            continue
+        else:
+            out.append(tok)
+    return "".join(out).lower()
+
+_AA_1_TO_3 = {
+    "A": "Ala", "R": "Arg", "N": "Asn", "D": "Asp", "C": "Cys",
+    "Q": "Gln", "E": "Glu", "G": "Gly", "H": "His", "I": "Ile",
+    "L": "Leu", "K": "Lys", "M": "Met", "F": "Phe", "P": "Pro",
+    "S": "Ser", "T": "Thr", "W": "Trp", "Y": "Tyr", "V": "Val",
+    "B": "Asx", "Z": "Glx", "X": "Xaa", "*": "Stop",
+}
+_AA_3_TO_1 = {v.upper(): k for k, v in _AA_1_TO_3.items()}
+
+def AminoAcid_encode(text: str) -> str:
+    out = []
+    for ch in text:
+        cu = ch.upper()
+        if cu in _AA_1_TO_3:
+            out.append(_AA_1_TO_3[cu])
+        elif ch.isspace():
+            out.append("/")
+        else:
+            out.append(ch)
+    return " ".join(out)
+
+def AminoAcid_decode(text: str) -> str:
+    out = []
+    for tok in text.replace("/", " / ").split():
+        up = tok.upper()
+        if tok == "/":
+            out.append(" ")
+        elif up in _AA_3_TO_1:
+            out.append(_AA_3_TO_1[up])
+        else:
+            out.append(tok)
+    return "".join(out).lower()
+
+def IChingHexagram_encode(text: str) -> str:
+    bits = "".join(f"{byte:08b}" for byte in text.encode("utf-8"))
+    if len(bits) % 6:
+        bits += "0" * (6 - len(bits) % 6)
+    return "".join(chr(0x4DC0 + int(bits[i:i+6], 2)) for i in range(0, len(bits), 6))
+
+def IChingHexagram_decode(text: str) -> str:
+    vals = []
+    for ch in text:
+        code = ord(ch)
+        if 0x4DC0 <= code <= 0x4DFF:
+            vals.append(f"{code - 0x4DC0:06b}")
+        elif ch.isspace():
+            continue
+        else:
+            return f"Err:invalid hexagram '{ch}'"
+    bits = "".join(vals)
+    bits = bits[:len(bits) - (len(bits) % 8)]
+    try:
+        return bytes(int(bits[i:i+8], 2) for i in range(0, len(bits), 8)).decode("utf-8").rstrip("\x00")
+    except Exception as exc:
+        return f"Err:{exc}"
+
+_TAROT_CARDS = [
+    "Fool", "Magician", "HighPriestess", "Empress", "Emperor", "Hierophant", "Lovers", "Chariot",
+    "Strength", "Hermit", "WheelOfFortune", "Justice", "HangedMan", "Death", "Temperance", "Devil",
+    "Tower", "Star", "Moon", "Sun", "Judgement", "World",
+    "AceWands", "TwoWands", "ThreeWands", "FourWands", "FiveWands", "SixWands", "SevenWands",
+    "EightWands", "NineWands", "TenWands", "PageWands", "KnightWands", "QueenWands", "KingWands",
+    "AceCups", "TwoCups", "ThreeCups", "FourCups", "FiveCups", "SixCups", "SevenCups", "EightCups",
+    "NineCups", "TenCups", "PageCups", "KnightCups", "QueenCups", "KingCups",
+    "AceSwords", "TwoSwords", "ThreeSwords", "FourSwords", "FiveSwords", "SixSwords",
+    "SevenSwords", "EightSwords", "NineSwords", "TenSwords", "PageSwords", "KnightSwords",
+    "QueenSwords", "KingSwords",
+    "AcePentacles", "TwoPentacles", "ThreePentacles", "FourPentacles", "FivePentacles",
+    "SixPentacles", "SevenPentacles", "EightPentacles", "NinePentacles", "TenPentacles",
+    "PagePentacles", "KnightPentacles", "QueenPentacles", "KingPentacles",
+]
+_TAROT_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,!?;:-_/@#$%&*+=()[]{}<>"
+_TAROT_MAP = {ch: _TAROT_CARDS[i] for i, ch in enumerate(_TAROT_ALPHABET)}
+_TAROT_REV = {v.upper(): ch for ch, v in _TAROT_MAP.items()}
+
+def TarotCard_encode(text: str) -> str:
+    out = []
+    for ch in text:
+        cu = ch.upper()
+        if cu in _TAROT_MAP:
+            out.append(_TAROT_MAP[cu])
+        else:
+            out.append(ch)
+    return " ".join(out)
+
+def TarotCard_decode(text: str) -> str:
+    out = []
+    for tok in text.split():
+        key = re.sub(r"[^A-Z0-9]+", "", tok.upper())
+        out.append(_TAROT_REV.get(key, tok))
+    return "".join(out).lower()
 
 # =============================================================================
 # Polybius/Playfair family & transpositions & routes
@@ -6921,6 +6921,86 @@ def ChaCha20_hex_decode(text: str, key: str = "secret", nonce: str = "0000000000
     nonce_bytes = _parse_chacha_nonce(str(nonce))
     plain = _xor_stream(data, _chacha20_stream(_chacha_key(key), nonce_bytes, int(counter)))
     return plain.decode("utf-8", errors="replace")
+
+
+def _cryptography_missing(name: str) -> str:
+    return f"Err:{name} requires the optional 'cryptography' package"
+
+def _aead_key(key: str, sizes: Tuple[int, ...] = (16, 24, 32)) -> bytes:
+    raw = (key or "").strip()
+    if re.fullmatch(r"[0-9a-fA-F]+", raw or "") and len(raw) % 2 == 0:
+        data = bytes.fromhex(raw)
+        if len(data) in sizes:
+            return data
+    return hashlib.sha256((key or "secret").encode("utf-8")).digest()[:max(sizes)]
+
+def _nonce_bytes(nonce: str, size: int) -> bytes:
+    raw = (nonce or "").strip()
+    if re.fullmatch(r"[0-9a-fA-F]+", raw or "") and len(raw) == size * 2:
+        return bytes.fromhex(raw)
+    return hashlib.sha256((nonce or "nonce").encode("utf-8")).digest()[:size]
+
+def AESGCM_hex_encode(text: str, key: str = "secret", nonce: str = "nonce", aad: str = "") -> str:
+    if importlib.util.find_spec("cryptography") is None:
+        return _cryptography_missing("AES-GCM")
+    AESGCM = importlib.import_module("cryptography.hazmat.primitives.ciphers.aead").AESGCM
+    nonce_bytes = _nonce_bytes(nonce, 12)
+    aad_bytes = (aad or "").encode("utf-8")
+    cipher = AESGCM(_aead_key(key)).encrypt(nonce_bytes, text.encode("utf-8"), aad_bytes)
+    meta = {"nonce": nonce_bytes.hex(), "aad": aad}
+    return "[AESGCM]" + json.dumps(meta, separators=(",", ":")) + "|" + cipher.hex()
+
+def AESGCM_hex_decode(text: str, key: str = "secret", nonce: str = "nonce", aad: str = "") -> str:
+    if importlib.util.find_spec("cryptography") is None:
+        return _cryptography_missing("AES-GCM")
+    AESGCM = importlib.import_module("cryptography.hazmat.primitives.ciphers.aead").AESGCM
+    body = text.strip()
+    if body.startswith("[AESGCM]"):
+        meta_end = body.index("|", len("[AESGCM]"))
+        meta = json.loads(body[len("[AESGCM]"):meta_end])
+        nonce = meta.get("nonce", nonce)
+        aad = meta.get("aad", aad)
+        body = body[meta_end+1:]
+    plain = AESGCM(_aead_key(key)).decrypt(_nonce_bytes(str(nonce), 12), bytes.fromhex(body), (aad or "").encode("utf-8"))
+    return plain.decode("utf-8")
+
+def ChaCha20Poly1305_hex_encode(text: str, key: str = "secret", nonce: str = "nonce", aad: str = "") -> str:
+    if importlib.util.find_spec("cryptography") is None:
+        return _cryptography_missing("ChaCha20-Poly1305")
+    ChaCha20Poly1305 = importlib.import_module("cryptography.hazmat.primitives.ciphers.aead").ChaCha20Poly1305
+    nonce_bytes = _nonce_bytes(nonce, 12)
+    aad_bytes = (aad or "").encode("utf-8")
+    cipher = ChaCha20Poly1305(_aead_key(key, (32,))).encrypt(nonce_bytes, text.encode("utf-8"), aad_bytes)
+    meta = {"nonce": nonce_bytes.hex(), "aad": aad}
+    return "[CHACHA20POLY1305]" + json.dumps(meta, separators=(",", ":")) + "|" + cipher.hex()
+
+def ChaCha20Poly1305_hex_decode(text: str, key: str = "secret", nonce: str = "nonce", aad: str = "") -> str:
+    if importlib.util.find_spec("cryptography") is None:
+        return _cryptography_missing("ChaCha20-Poly1305")
+    ChaCha20Poly1305 = importlib.import_module("cryptography.hazmat.primitives.ciphers.aead").ChaCha20Poly1305
+    body = text.strip()
+    if body.startswith("[CHACHA20POLY1305]"):
+        meta_end = body.index("|", len("[CHACHA20POLY1305]"))
+        meta = json.loads(body[len("[CHACHA20POLY1305]"):meta_end])
+        nonce = meta.get("nonce", nonce)
+        aad = meta.get("aad", aad)
+        body = body[meta_end+1:]
+    plain = ChaCha20Poly1305(_aead_key(key, (32,))).decrypt(_nonce_bytes(str(nonce), 12), bytes.fromhex(body), (aad or "").encode("utf-8"))
+    return plain.decode("utf-8")
+
+def FernetToken_encode(text: str, password: str = "secret") -> str:
+    if importlib.util.find_spec("cryptography") is None:
+        return _cryptography_missing("Fernet")
+    Fernet = importlib.import_module("cryptography.fernet").Fernet
+    fkey = base64.urlsafe_b64encode(hashlib.sha256((password or "secret").encode("utf-8")).digest())
+    return Fernet(fkey).encrypt(text.encode("utf-8")).decode("ascii")
+
+def FernetToken_decode(text: str, password: str = "secret") -> str:
+    if importlib.util.find_spec("cryptography") is None:
+        return _cryptography_missing("Fernet")
+    Fernet = importlib.import_module("cryptography.fernet").Fernet
+    fkey = base64.urlsafe_b64encode(hashlib.sha256((password or "secret").encode("utf-8")).digest())
+    return Fernet(fkey).decrypt(text.encode("ascii")).decode("utf-8")
 
 
 def _parse_salsa_nonce(nonce: str) -> bytes:
@@ -7991,119 +8071,6 @@ def Emoji_decode(text: str) -> str:
         out.append(mapping.get(cp, "" if not ch.isspace() else " "))
     return "".join(out).lower()
 
-EMOJI_ALPHA_PACKS = {
-    "faces": list("😀😁😂😃😄😅😆😇😈😉😊😋😌😍😎😏😐😑😒😓😔😕😖😗😘😙😚"),
-    "animals": list("🐶🐱🐭🐹🐰🦊🐻🐼🐨🐯🦁🐮🐷🐸🐵🙈🙉🙊🐔🐧🐦🐤🐣🦆🦅🦉🐺"),
-    "food": list("🍎🍊🍋🍌🍉🍇🍓🫐🍒🥭🍍🥥🥝🍅🍆🥑🥦🥬🥒🌶️🫑🌽🥕🫒🧄🧅🥔"),
-    "weather": list("☀️🌤️⛅🌥️☁️🌦️🌧️⛈️🌩️🌨️❄️☃️⛄🌬️💨💧💦☔🌈⭐🌟✨⚡🔥🌪️🌫️🌊"),
-}
-EMOJI_ALPHA_SYMBOLS = ALPHA + " "
-
-def _emoji_pack_build(pack: str = "faces") -> Tuple[Dict[str, str], Dict[str, str]]:
-    key = (pack or "faces").strip().lower()
-    if key not in EMOJI_ALPHA_PACKS:
-        raise ValueError(f"unknown emoji pack: {pack}")
-    symbols = EMOJI_ALPHA_PACKS[key]
-    if len(symbols) != len(EMOJI_ALPHA_SYMBOLS):
-        raise ValueError("emoji pack size mismatch")
-    enc = {plain: symbol for plain, symbol in zip(EMOJI_ALPHA_SYMBOLS, symbols)}
-    dec = {symbol: plain for plain, symbol in enc.items()}
-    return enc, dec
-
-def EmojiAlphabet_encode(text: str, pack: str = "faces") -> str:
-    try:
-        enc, _ = _emoji_pack_build(pack)
-        out = []
-        for ch in to_upper(text):
-            if ch in enc:
-                out.append(enc[ch])
-            elif ch.isspace():
-                out.append(enc[" "])
-            else:
-                out.append(ch)
-        return f"[EMOJI-ALPHA:{(pack or 'faces').strip().lower()}]" + "".join(out)
-    except Exception as e:
-        return f"Err:{e}"
-
-def EmojiAlphabet_decode(text: str, pack: str = "faces") -> str:
-    try:
-        body = text
-        use_pack = (pack or "faces").strip().lower()
-        if text.startswith("[EMOJI-ALPHA:"):
-            tag_end = text.index("]")
-            use_pack = text[len("[EMOJI-ALPHA:"):tag_end].strip().lower() or use_pack
-            body = text[tag_end+1:]
-        _, dec = _emoji_pack_build(use_pack)
-        out = []
-        i = 0
-        symbols = sorted(dec.keys(), key=len, reverse=True)
-        while i < len(body):
-            matched = False
-            for symbol in symbols:
-                if body.startswith(symbol, i):
-                    out.append(dec[symbol])
-                    i += len(symbol)
-                    matched = True
-                    break
-            if matched:
-                continue
-            out.append(body[i])
-            i += 1
-        return "".join(out).lower()
-    except Exception as e:
-        return f"Err:{e}"
-
-def EmojiBinary_encode(text: str, zero: str = "⬜", one: str = "⬛", sep: str = " ") -> str:
-    try:
-        if zero == one:
-            return "Err:zero and one emojis must differ"
-        tokens = []
-        for byte in text.encode("utf-8"):
-            bits = format(byte, "08b")
-            tokens.append("".join(one if bit == "1" else zero for bit in bits))
-        meta = {"zero": zero, "one": one, "sep": sep}
-        return "[EMOJI-BIN]" + json.dumps(meta, ensure_ascii=False) + "|" + sep.join(tokens)
-    except Exception as e:
-        return f"Err:{e}"
-
-def EmojiBinary_decode(text: str, zero: str = "⬜", one: str = "⬛", sep: str = " ") -> str:
-    try:
-        body = text
-        if text.startswith("[EMOJI-BIN]"):
-            decoder = json.JSONDecoder()
-            meta, offset = decoder.raw_decode(text[len("[EMOJI-BIN]"):])
-            meta_end = len("[EMOJI-BIN]") + offset
-            if meta_end >= len(text) or text[meta_end] != "|":
-                raise ValueError("bad emoji binary format")
-            zero = str(meta.get("zero", zero))
-            one = str(meta.get("one", one))
-            sep = str(meta.get("sep", sep))
-            body = text[meta_end+1:]
-        if zero == one:
-            return "Err:zero and one emojis must differ"
-        tokens = body.split(sep) if sep else [body[i:i+8] for i in range(0, len(body), 8)]
-        bytes_out = bytearray()
-        for token in tokens:
-            if not token:
-                continue
-            bits = ""
-            i = 0
-            while i < len(token):
-                if token.startswith(zero, i):
-                    bits += "0"
-                    i += len(zero)
-                elif token.startswith(one, i):
-                    bits += "1"
-                    i += len(one)
-                else:
-                    raise ValueError("invalid emoji binary token")
-            if len(bits) != 8:
-                raise ValueError("emoji binary tokens must decode to 8 bits")
-            bytes_out.append(int(bits, 2))
-        return bytes(bytes_out).decode("utf-8")
-    except Exception as e:
-        return f"Err:{e}"
-
 # Whitespace
 def WS_encode(text: str, n: int | str = None) -> str:
     data = text.encode("utf-8")
@@ -8499,10 +8466,6 @@ def SmartGuess(text: str) -> List[Tuple[str, str, float]]:
             pt = HOMO_decode(t); candidates.append(("Homophonic (tag)", pt, english_score(pt)))
         if t.startswith("[EMOJI]"):
             pt = Emoji_decode(t); candidates.append(("Emoji (tag)", pt, english_score(pt)))
-        if t.startswith("[EMOJI-BIN]"):
-            pt = EmojiBinary_decode(t); candidates.append(("Emoji Binary (tag)", pt, english_score(pt)))
-        if t.startswith("[EMOJI-ALPHA:"):
-            pt = EmojiAlphabet_decode(t); candidates.append(("Emoji Alphabet Pack (tag)", pt, english_score(pt)))
         if t.startswith("[WS]"):
             pt = WS_decode(t); candidates.append(("Whitespace (tag)", pt, english_score(pt)))
         if t.startswith("[FM]"):
@@ -8876,8 +8839,6 @@ def get_registry() -> List[CipherEntry]:
         CipherEntry("Upside-down Text", UpsideDown_encode, UpsideDown_decode, []),
         CipherEntry("Mirror Text", MirrorText_encode, MirrorText_decode, []),
         CipherEntry("Zero-width Binary", ZeroWidthBinary_encode, ZeroWidthBinary_decode, []),
-        CipherEntry("Emoji Binary", EmojiBinary_encode, EmojiBinary_decode, [P("zero","Zero emoji","⬜"), P("one","One emoji","⬛"), P("sep","Separator"," ")]),
-        CipherEntry("Emoji Alphabet Pack", EmojiAlphabet_encode, EmojiAlphabet_decode, [P("pack","Pack","faces")]),
         CipherEntry("Bacon Biliteral", BaconBiliteral_encode, BaconBiliteral_decode, [P("a_char","A character","A"), P("b_char","B character","B")]),
         CipherEntry("Whitespace Binary", WhitespaceBinary_encode, WhitespaceBinary_decode, []),
         CipherEntry("Snow Steg", SnowSteg_encode, SnowSteg_decode, [P("cover","Cover text","snow")]),
@@ -8969,13 +8930,9 @@ def get_registry() -> List[CipherEntry]:
         CipherEntry("Fibonacci Code", FibonacciCode_encode, FibonacciCode_decode, []),
         CipherEntry("Hamming(15,11)", Hamming1511_encode, Hamming1511_decode, []),
         CipherEntry("LEB128", LEB128_encode, LEB128_decode, []),
-        CipherEntry("SLEB128", SLEB128_encode, SLEB128_decode, []),
         CipherEntry("Elias Delta", EliasDelta_encode, EliasDelta_decode, []),
-        CipherEntry("Exp-Golomb", ExpGolomb_encode, ExpGolomb_decode, [P("k","Order k","0")]),
         CipherEntry("Golomb", Golomb_encode, Golomb_decode, [P("m","Divisor m","10")]),
-        CipherEntry("Rice", Rice_encode, Rice_decode, [P("k","Parameter k","3")]),
         CipherEntry("CRC8", CRC8_encode, CRC8_decode, []),
-        CipherEntry("CRC24-OPENPGP", CRC24OpenPGP_encode, CRC24OpenPGP_decode, []),
         CipherEntry("CRC64-ECMA", CRC64ECMA_encode, CRC64ECMA_decode, []),
         CipherEntry("MD5", MD5_encode, MD5_decode, []),
         CipherEntry("SHA1", SHA1_encode, SHA1_decode, []),
@@ -8992,6 +8949,11 @@ def get_registry() -> List[CipherEntry]:
         CipherEntry("Unicode \\u Escapes", UEscapes_encode, UEscapes_decode, []),
         CipherEntry("ASCII Shift (hex)", AsciiShiftHex_encode, AsciiShiftHex_decode, [P("shift","Shift","1")]),
         CipherEntry("DNA Encoding", DNA_encode, DNA_decode, []),
+        CipherEntry("DNA Codons", DNACodon_encode, DNACodon_decode, []),
+        CipherEntry("RNA Codons", RNACodon_encode, RNACodon_decode, []),
+        CipherEntry("Amino Acid 1/3", AminoAcid_encode, AminoAcid_decode, []),
+        CipherEntry("I Ching Hexagrams", IChingHexagram_encode, IChingHexagram_decode, []),
+        CipherEntry("Tarot Cards", TarotCard_encode, TarotCard_decode, []),
 
         # Polygraphic / transposition
         CipherEntry("Polybius", Polybius_encode, Polybius_decode, [P("key","Key","KEYWORD")]),
@@ -9055,6 +9017,9 @@ def get_registry() -> List[CipherEntry]:
         CipherEntry("RC4 (hex)", RC4_hex_encode, RC4_hex_decode, [P("key","Key","secret")]),
         CipherEntry("Solitaire", Solitaire_encode, Solitaire_decode, [P("key","Key","CRYPTONOMICON")]),
         CipherEntry("ChaCha20 (hex)", ChaCha20_hex_encode, ChaCha20_hex_decode, [P("key","Key","secret"), P("nonce","Nonce","000000000000000000000000"), P("counter","Counter","1")]),
+        CipherEntry("AES-GCM (hex)", AESGCM_hex_encode, AESGCM_hex_decode, [P("key","Key/hex key","secret"), P("nonce","Nonce/hex nonce","nonce"), P("aad","AAD","")]),
+        CipherEntry("ChaCha20-Poly1305 (hex)", ChaCha20Poly1305_hex_encode, ChaCha20Poly1305_hex_decode, [P("key","Key/hex key","secret"), P("nonce","Nonce/hex nonce","nonce"), P("aad","AAD","")]),
+        CipherEntry("Fernet Token", FernetToken_encode, FernetToken_decode, [P("password","Password","secret")]),
         CipherEntry("ChaCha12 (hex)", ChaCha12_hex_encode, ChaCha12_hex_decode, [P("key","Key","secret"), P("nonce","Nonce","000000000000000000000000"), P("counter","Counter","1")]),
         CipherEntry("ChaCha8 (hex)", ChaCha8_hex_encode, ChaCha8_hex_decode, [P("key","Key","secret"), P("nonce","Nonce","000000000000000000000000"), P("counter","Counter","1")]),
         CipherEntry("Salsa20 (hex)", Salsa20_hex_encode, Salsa20_hex_decode, [P("key","Key","secret"), P("nonce","Nonce","0000000000000000"), P("counter","Counter","0")]),
@@ -9631,8 +9596,6 @@ class CipherGUI:
         tag_map = {
             "[HOMO]": "Homophonic",
             "[EMOJI]": "Emoji Substitution",
-            "[EMOJI-BIN]": "Emoji Binary",
-            "[EMOJI-ALPHA:": "Emoji Alphabet Pack",
             "[WS]": "Whitespace Encoding",
             "[FM]": "Fractionated Morse",
             "[MORSE]": "Morse",

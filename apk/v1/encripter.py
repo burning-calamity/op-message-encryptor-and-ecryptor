@@ -23,6 +23,8 @@ import html
 import hashlib
 import gzip
 import hmac
+import importlib
+import importlib.util
 import json
 import math
 import quopri
@@ -6086,6 +6088,143 @@ def DNA_decode(text: str) -> str:
     data = bytes(int(bits[i:i+8], 2) for i in range(0, len(bits), 8))
     return data.decode("utf-8", errors="replace")
 
+_CODON_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,!?;:-_/@#$%&*+=()[]{}"
+_DNA_BASES = "ACGT"
+_RNA_BASES = "ACGU"
+
+def _codon_table(bases: str) -> Dict[str, str]:
+    return {ch: bases[(i >> 4) & 3] + bases[(i >> 2) & 3] + bases[i & 3] for i, ch in enumerate(_CODON_ALPHABET)}
+
+def _codon_rev(bases: str) -> Dict[str, str]:
+    table = _codon_table(bases)
+    return {v: k for k, v in table.items()}
+
+def DNACodon_encode(text: str) -> str:
+    table = _codon_table(_DNA_BASES)
+    return " ".join(table.get(ch.upper(), ch) for ch in text)
+
+def DNACodon_decode(text: str) -> str:
+    rev = _codon_rev(_DNA_BASES)
+    out = []
+    for tok in re.findall(r"[ACGTacgt]{3}|.", text):
+        up = tok.upper()
+        if up in rev:
+            out.append(rev[up])
+        elif tok.isspace():
+            continue
+        else:
+            out.append(tok)
+    return "".join(out).lower()
+
+def RNACodon_encode(text: str) -> str:
+    table = _codon_table(_RNA_BASES)
+    return " ".join(table.get(ch.upper(), ch) for ch in text)
+
+def RNACodon_decode(text: str) -> str:
+    rev = _codon_rev(_RNA_BASES)
+    out = []
+    for tok in re.findall(r"[ACGUacgu]{3}|.", text):
+        up = tok.upper()
+        if up in rev:
+            out.append(rev[up])
+        elif tok.isspace():
+            continue
+        else:
+            out.append(tok)
+    return "".join(out).lower()
+
+_AA_1_TO_3 = {
+    "A": "Ala", "R": "Arg", "N": "Asn", "D": "Asp", "C": "Cys",
+    "Q": "Gln", "E": "Glu", "G": "Gly", "H": "His", "I": "Ile",
+    "L": "Leu", "K": "Lys", "M": "Met", "F": "Phe", "P": "Pro",
+    "S": "Ser", "T": "Thr", "W": "Trp", "Y": "Tyr", "V": "Val",
+    "B": "Asx", "Z": "Glx", "X": "Xaa", "*": "Stop",
+}
+_AA_3_TO_1 = {v.upper(): k for k, v in _AA_1_TO_3.items()}
+
+def AminoAcid_encode(text: str) -> str:
+    out = []
+    for ch in text:
+        cu = ch.upper()
+        if cu in _AA_1_TO_3:
+            out.append(_AA_1_TO_3[cu])
+        elif ch.isspace():
+            out.append("/")
+        else:
+            out.append(ch)
+    return " ".join(out)
+
+def AminoAcid_decode(text: str) -> str:
+    out = []
+    for tok in text.replace("/", " / ").split():
+        up = tok.upper()
+        if tok == "/":
+            out.append(" ")
+        elif up in _AA_3_TO_1:
+            out.append(_AA_3_TO_1[up])
+        else:
+            out.append(tok)
+    return "".join(out).lower()
+
+def IChingHexagram_encode(text: str) -> str:
+    bits = "".join(f"{byte:08b}" for byte in text.encode("utf-8"))
+    if len(bits) % 6:
+        bits += "0" * (6 - len(bits) % 6)
+    return "".join(chr(0x4DC0 + int(bits[i:i+6], 2)) for i in range(0, len(bits), 6))
+
+def IChingHexagram_decode(text: str) -> str:
+    vals = []
+    for ch in text:
+        code = ord(ch)
+        if 0x4DC0 <= code <= 0x4DFF:
+            vals.append(f"{code - 0x4DC0:06b}")
+        elif ch.isspace():
+            continue
+        else:
+            return f"Err:invalid hexagram '{ch}'"
+    bits = "".join(vals)
+    bits = bits[:len(bits) - (len(bits) % 8)]
+    try:
+        return bytes(int(bits[i:i+8], 2) for i in range(0, len(bits), 8)).decode("utf-8").rstrip("\x00")
+    except Exception as exc:
+        return f"Err:{exc}"
+
+_TAROT_CARDS = [
+    "Fool", "Magician", "HighPriestess", "Empress", "Emperor", "Hierophant", "Lovers", "Chariot",
+    "Strength", "Hermit", "WheelOfFortune", "Justice", "HangedMan", "Death", "Temperance", "Devil",
+    "Tower", "Star", "Moon", "Sun", "Judgement", "World",
+    "AceWands", "TwoWands", "ThreeWands", "FourWands", "FiveWands", "SixWands", "SevenWands",
+    "EightWands", "NineWands", "TenWands", "PageWands", "KnightWands", "QueenWands", "KingWands",
+    "AceCups", "TwoCups", "ThreeCups", "FourCups", "FiveCups", "SixCups", "SevenCups", "EightCups",
+    "NineCups", "TenCups", "PageCups", "KnightCups", "QueenCups", "KingCups",
+    "AceSwords", "TwoSwords", "ThreeSwords", "FourSwords", "FiveSwords", "SixSwords",
+    "SevenSwords", "EightSwords", "NineSwords", "TenSwords", "PageSwords", "KnightSwords",
+    "QueenSwords", "KingSwords",
+    "AcePentacles", "TwoPentacles", "ThreePentacles", "FourPentacles", "FivePentacles",
+    "SixPentacles", "SevenPentacles", "EightPentacles", "NinePentacles", "TenPentacles",
+    "PagePentacles", "KnightPentacles", "QueenPentacles", "KingPentacles",
+]
+_TAROT_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,!?;:-_/@#$%&*+=()[]{}<>"
+_TAROT_MAP = {ch: _TAROT_CARDS[i] for i, ch in enumerate(_TAROT_ALPHABET)}
+_TAROT_REV = {v.upper(): ch for ch, v in _TAROT_MAP.items()}
+
+def TarotCard_encode(text: str) -> str:
+    out = []
+    for ch in text:
+        cu = ch.upper()
+        if cu in _TAROT_MAP:
+            out.append(_TAROT_MAP[cu])
+        else:
+            out.append(ch)
+    return " ".join(out)
+
+def TarotCard_decode(text: str) -> str:
+    out = []
+    for tok in text.split():
+        key = re.sub(r"[^A-Z0-9]+", "", tok.upper())
+        out.append(_TAROT_REV.get(key, tok))
+    return "".join(out).lower()
+
 # =============================================================================
 # Polybius/Playfair family & transpositions & routes
 # =============================================================================
@@ -6782,6 +6921,86 @@ def ChaCha20_hex_decode(text: str, key: str = "secret", nonce: str = "0000000000
     nonce_bytes = _parse_chacha_nonce(str(nonce))
     plain = _xor_stream(data, _chacha20_stream(_chacha_key(key), nonce_bytes, int(counter)))
     return plain.decode("utf-8", errors="replace")
+
+
+def _cryptography_missing(name: str) -> str:
+    return f"Err:{name} requires the optional 'cryptography' package"
+
+def _aead_key(key: str, sizes: Tuple[int, ...] = (16, 24, 32)) -> bytes:
+    raw = (key or "").strip()
+    if re.fullmatch(r"[0-9a-fA-F]+", raw or "") and len(raw) % 2 == 0:
+        data = bytes.fromhex(raw)
+        if len(data) in sizes:
+            return data
+    return hashlib.sha256((key or "secret").encode("utf-8")).digest()[:max(sizes)]
+
+def _nonce_bytes(nonce: str, size: int) -> bytes:
+    raw = (nonce or "").strip()
+    if re.fullmatch(r"[0-9a-fA-F]+", raw or "") and len(raw) == size * 2:
+        return bytes.fromhex(raw)
+    return hashlib.sha256((nonce or "nonce").encode("utf-8")).digest()[:size]
+
+def AESGCM_hex_encode(text: str, key: str = "secret", nonce: str = "nonce", aad: str = "") -> str:
+    if importlib.util.find_spec("cryptography") is None:
+        return _cryptography_missing("AES-GCM")
+    AESGCM = importlib.import_module("cryptography.hazmat.primitives.ciphers.aead").AESGCM
+    nonce_bytes = _nonce_bytes(nonce, 12)
+    aad_bytes = (aad or "").encode("utf-8")
+    cipher = AESGCM(_aead_key(key)).encrypt(nonce_bytes, text.encode("utf-8"), aad_bytes)
+    meta = {"nonce": nonce_bytes.hex(), "aad": aad}
+    return "[AESGCM]" + json.dumps(meta, separators=(",", ":")) + "|" + cipher.hex()
+
+def AESGCM_hex_decode(text: str, key: str = "secret", nonce: str = "nonce", aad: str = "") -> str:
+    if importlib.util.find_spec("cryptography") is None:
+        return _cryptography_missing("AES-GCM")
+    AESGCM = importlib.import_module("cryptography.hazmat.primitives.ciphers.aead").AESGCM
+    body = text.strip()
+    if body.startswith("[AESGCM]"):
+        meta_end = body.index("|", len("[AESGCM]"))
+        meta = json.loads(body[len("[AESGCM]"):meta_end])
+        nonce = meta.get("nonce", nonce)
+        aad = meta.get("aad", aad)
+        body = body[meta_end+1:]
+    plain = AESGCM(_aead_key(key)).decrypt(_nonce_bytes(str(nonce), 12), bytes.fromhex(body), (aad or "").encode("utf-8"))
+    return plain.decode("utf-8")
+
+def ChaCha20Poly1305_hex_encode(text: str, key: str = "secret", nonce: str = "nonce", aad: str = "") -> str:
+    if importlib.util.find_spec("cryptography") is None:
+        return _cryptography_missing("ChaCha20-Poly1305")
+    ChaCha20Poly1305 = importlib.import_module("cryptography.hazmat.primitives.ciphers.aead").ChaCha20Poly1305
+    nonce_bytes = _nonce_bytes(nonce, 12)
+    aad_bytes = (aad or "").encode("utf-8")
+    cipher = ChaCha20Poly1305(_aead_key(key, (32,))).encrypt(nonce_bytes, text.encode("utf-8"), aad_bytes)
+    meta = {"nonce": nonce_bytes.hex(), "aad": aad}
+    return "[CHACHA20POLY1305]" + json.dumps(meta, separators=(",", ":")) + "|" + cipher.hex()
+
+def ChaCha20Poly1305_hex_decode(text: str, key: str = "secret", nonce: str = "nonce", aad: str = "") -> str:
+    if importlib.util.find_spec("cryptography") is None:
+        return _cryptography_missing("ChaCha20-Poly1305")
+    ChaCha20Poly1305 = importlib.import_module("cryptography.hazmat.primitives.ciphers.aead").ChaCha20Poly1305
+    body = text.strip()
+    if body.startswith("[CHACHA20POLY1305]"):
+        meta_end = body.index("|", len("[CHACHA20POLY1305]"))
+        meta = json.loads(body[len("[CHACHA20POLY1305]"):meta_end])
+        nonce = meta.get("nonce", nonce)
+        aad = meta.get("aad", aad)
+        body = body[meta_end+1:]
+    plain = ChaCha20Poly1305(_aead_key(key, (32,))).decrypt(_nonce_bytes(str(nonce), 12), bytes.fromhex(body), (aad or "").encode("utf-8"))
+    return plain.decode("utf-8")
+
+def FernetToken_encode(text: str, password: str = "secret") -> str:
+    if importlib.util.find_spec("cryptography") is None:
+        return _cryptography_missing("Fernet")
+    Fernet = importlib.import_module("cryptography.fernet").Fernet
+    fkey = base64.urlsafe_b64encode(hashlib.sha256((password or "secret").encode("utf-8")).digest())
+    return Fernet(fkey).encrypt(text.encode("utf-8")).decode("ascii")
+
+def FernetToken_decode(text: str, password: str = "secret") -> str:
+    if importlib.util.find_spec("cryptography") is None:
+        return _cryptography_missing("Fernet")
+    Fernet = importlib.import_module("cryptography.fernet").Fernet
+    fkey = base64.urlsafe_b64encode(hashlib.sha256((password or "secret").encode("utf-8")).digest())
+    return Fernet(fkey).decrypt(text.encode("ascii")).decode("utf-8")
 
 
 def _parse_salsa_nonce(nonce: str) -> bytes:
@@ -8730,6 +8949,11 @@ def get_registry() -> List[CipherEntry]:
         CipherEntry("Unicode \\u Escapes", UEscapes_encode, UEscapes_decode, []),
         CipherEntry("ASCII Shift (hex)", AsciiShiftHex_encode, AsciiShiftHex_decode, [P("shift","Shift","1")]),
         CipherEntry("DNA Encoding", DNA_encode, DNA_decode, []),
+        CipherEntry("DNA Codons", DNACodon_encode, DNACodon_decode, []),
+        CipherEntry("RNA Codons", RNACodon_encode, RNACodon_decode, []),
+        CipherEntry("Amino Acid 1/3", AminoAcid_encode, AminoAcid_decode, []),
+        CipherEntry("I Ching Hexagrams", IChingHexagram_encode, IChingHexagram_decode, []),
+        CipherEntry("Tarot Cards", TarotCard_encode, TarotCard_decode, []),
 
         # Polygraphic / transposition
         CipherEntry("Polybius", Polybius_encode, Polybius_decode, [P("key","Key","KEYWORD")]),
@@ -8793,6 +9017,9 @@ def get_registry() -> List[CipherEntry]:
         CipherEntry("RC4 (hex)", RC4_hex_encode, RC4_hex_decode, [P("key","Key","secret")]),
         CipherEntry("Solitaire", Solitaire_encode, Solitaire_decode, [P("key","Key","CRYPTONOMICON")]),
         CipherEntry("ChaCha20 (hex)", ChaCha20_hex_encode, ChaCha20_hex_decode, [P("key","Key","secret"), P("nonce","Nonce","000000000000000000000000"), P("counter","Counter","1")]),
+        CipherEntry("AES-GCM (hex)", AESGCM_hex_encode, AESGCM_hex_decode, [P("key","Key/hex key","secret"), P("nonce","Nonce/hex nonce","nonce"), P("aad","AAD","")]),
+        CipherEntry("ChaCha20-Poly1305 (hex)", ChaCha20Poly1305_hex_encode, ChaCha20Poly1305_hex_decode, [P("key","Key/hex key","secret"), P("nonce","Nonce/hex nonce","nonce"), P("aad","AAD","")]),
+        CipherEntry("Fernet Token", FernetToken_encode, FernetToken_decode, [P("password","Password","secret")]),
         CipherEntry("ChaCha12 (hex)", ChaCha12_hex_encode, ChaCha12_hex_decode, [P("key","Key","secret"), P("nonce","Nonce","000000000000000000000000"), P("counter","Counter","1")]),
         CipherEntry("ChaCha8 (hex)", ChaCha8_hex_encode, ChaCha8_hex_decode, [P("key","Key","secret"), P("nonce","Nonce","000000000000000000000000"), P("counter","Counter","1")]),
         CipherEntry("Salsa20 (hex)", Salsa20_hex_encode, Salsa20_hex_decode, [P("key","Key","secret"), P("nonce","Nonce","0000000000000000"), P("counter","Counter","0")]),
