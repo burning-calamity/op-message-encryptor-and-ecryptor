@@ -87,6 +87,76 @@ global MODE_LIST := [
     "Ogham letters",
     "Semaphore text",
     "Masonic pigpen variant",
+    "Progressive Vigenere",
+    "Quagmire I",
+    "Quagmire II",
+    "Quagmire III",
+    "Quagmire IV",
+    "Alberti disk",
+    "Bellaso",
+    "Autokey Beaufort",
+    "Progressive Porta",
+    "Gronsfeld progressive",
+    "Keyed Atbash",
+    "Diana cipher",
+    "Random Caesar per letter",
+    "Fibonacci Caesar shift",
+    "Prime Caesar shift",
+    "Homophonic numbers",
+    "Base32 per letter",
+    "Quoted printable",
+    "Decimal A0Z25",
+    "Zero padded A1Z26",
+    "Octal A1Z26",
+    "Binary 6-bit index",
+    "Coordinate 0-based",
+    "Morse compact 01",
+    "Polybius reversed",
+    "Maritime signal flags",
+    "Regional indicator symbols",
+    "Circled letters",
+    "Squared unicode letters",
+    "Parenthesized letters",
+    "Fraktur letters",
+    "Script letters",
+    "Small caps",
+    "Superscript letters",
+    "Subscript letters",
+    "Zalgo light",
+    "Mirror text alphabet",
+    "Keyed Polybius square",
+    "Keyed ADFGX",
+    "Keyed ADFGVX",
+    "Morbit Morse",
+    "Fractionated Morse",
+    "Morse reverse",
+    "Morse emoji",
+    "Morse tap digits",
+    "Baconian 24 I/J",
+    "Kamasutra substitution",
+    "Phillips cipher",
+    "Slidefair pairs",
+    "Colemak keyboard",
+    "QWERTZ keyboard",
+    "Keyboard adjacent right",
+    "Keyboard adjacent left",
+    "Phone T9 digit",
+    "Phone multitap",
+    "Chess coordinates",
+    "Dice pair code",
+    "Domino tile code",
+    "Playing card code",
+    "Base58 index",
+    "Base62 index",
+    "Crockford Base32 index",
+    "Base85 per letter",
+    "UUencode per letter",
+    "EBCDIC hex",
+    "UTF-8 hex",
+    "UTF-16LE hex",
+    "HTML hex entity",
+    "LCG checksum token",
+    "Knuth checksum token",
     "Hex ASCII",
     "ASCII decimal",
     "Octal ASCII",
@@ -94,8 +164,29 @@ global MODE_LIST := [
     "Upside-down letters",
     "Greek lookalike",
     "Cyrillic lookalike",
-    "NATO words"
+    "NATO words",
+    "Rail fence block",
+    "Scytale transposition",
+    "Columnar transposition block",
+    "Double columnar block",
+    "Route cipher block",
+    "Myszkowski transposition block",
+    "Jefferson disk",
+    "M-94 cylinder style",
+    "Bazeries cylinder style",
+    "M-209 Hagelin style",
+    "VIC checkerboard",
+    "One-time pad A-Z",
+    "Vernam XOR 5-bit",
+    "RC4 hex stream",
+    "Solitaire/Pontifex",
+    "Bifid full period",
+    "Trifid full period",
+    "Nihilist numeric stream",
+    "Book cipher index"
 ]
+
+global displayedModeList := MODE_LIST.Clone()
 
 global ROTOR_NAMES := ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"]
 global THIN_ROTOR_NAMES := ["Beta", "Gamma"]
@@ -122,6 +213,10 @@ global plugboard := BuildPlugboard(plugboardPairs)
 
 global shiftValue := 3
 global keyText := "LEMON"
+global quagPlainKey := "CIPHER"
+global quagCipherKey := "MONARCHY"
+global quagIndicatorKey := "SECRET"
+global quagIndicatorPos := "A"
 global affineA := 5
 global affineB := 8
 global substitutionAlphabet := "QWERTYUIOPASDFGHJKLZXCVBNM"
@@ -135,11 +230,15 @@ global chaosLeftDefault := "HXUCZVAMDSLKPEFJRIGTWOBNYQ"
 global chaosRightDefault := "PTLNBQDEOYSFAVZKGJRIHWXUMC"
 global chaosLeft := chaosLeftDefault
 global chaosRight := chaosRightDefault
+global solitaireDeck := []
+global rc4S := []
+global rc4I := 0
+global rc4J := 0
 
 ; GUI references
 global mainGui := ""
 global headerText1 := "", headerText2 := "", enableBox := "", autoResetBox := ""
-global modeBox := "", presetBox := "", applyPresetBtn := ""
+global searchBox := "", modeBox := "", presetBox := "", applyPresetBtn := ""
 global settingTitleText := "", settingHintText := ""
 global outputModeBox := "", applyBtn := "", resetBtn := "", testBtn := "", quitBtn := ""
 global previewInputLabel := "", previewInput := "", previewOutputLabel := "", previewOutput := ""
@@ -157,6 +256,9 @@ global thinLabel := "", thinBox := "", leftLabel := "", leftBox := "", middleLab
 global reflectorLabel := "", reflectorBox := "", startLabel := "", startEdit := "", ringsLabel := "", ringsEdit := "", plugboardLabel := "", plugboardEdit := ""
 global shiftLabel := "", shiftEdit := "", keyLabel := "", keyEdit := "", affineALabel := "", affineAEdit := "", affineBLabel := "", affineBEdit := ""
 global substitutionLabel := "", substitutionEdit := "", randBtn := ""
+global quagmirePanelControls := [], quagPlainControls := [], quagCipherControls := [], quagIndicatorControls := []
+global quagPlainLabel := "", quagPlainEdit := "", quagCipherLabel := "", quagCipherEdit := ""
+global quagIndicatorLabel := "", quagIndicatorEdit := "", quagPositionLabel := "", quagPositionBox := "", quagHelp := ""
 
 BuildGui()
 return
@@ -167,7 +269,7 @@ return
 
 ^!e::ToggleEnabledFromHotkey()
 ^!r::ResetStateFromHotkey()
-^!q::ExitApp
+^!q::ExitApp()
 
 #HotIf IsEncryptionActive()
 $a::SendEncrypted("a", false)
@@ -230,12 +332,12 @@ $+z::SendEncrypted("z", true)
 ; ------------------------------------------------------------
 
 BuildGui() {
-    global mainGui, headerText1, headerText2, enableBox, autoResetBox, modeBox, presetBox, applyPresetBtn
+    global mainGui, headerText1, headerText2, enableBox, autoResetBox, searchBox, modeBox, presetBox, applyPresetBtn
     global settingTitleText, settingHintText, outputModeBox, applyBtn, resetBtn, testBtn, quitBtn
     global previewInputLabel, previewInput, previewOutputLabel, previewOutput, statusText, stateText, hotkeyText, noteText
-    global MODE_LIST, modeName, autoResetOnEnable, enabled
+    global MODE_LIST, displayedModeList, modeName, autoResetOnEnable, enabled
 
-    mainGui := Gui("+AlwaysOnTop +Resize +MinSize900x700", "Live Typing Cipher — Random Presets + More Ciphers")
+    mainGui := Gui("+AlwaysOnTop +Resize +MinSize900x700", "Live Typing Cipher — v7 real-world ciphers + search")
     mainGui.SetFont("s10", "Segoe UI")
     mainGui.MarginX := 16
     mainGui.MarginY := 12
@@ -250,9 +352,14 @@ BuildGui() {
     autoResetBox := mainGui.AddCheckBox("x190 y76 w240", "Reset state when enabling")
     autoResetBox.Value := autoResetOnEnable ? 1 : 0
 
+    mainGui.AddText("x450 y80 w60", "Search:")
+    searchBox := mainGui.AddEdit("x512 y76 w310", "")
+    searchBox.OnEvent("Change", SearchChanged)
+
     mainGui.AddText("xm y116 w90", "Mode:")
-    modeBox := mainGui.AddDropDownList("x82 y112 w240", MODE_LIST)
-    modeBox.Choose(IndexOf(MODE_LIST, modeName))
+    displayedModeList := MODE_LIST.Clone()
+    modeBox := mainGui.AddDropDownList("x82 y112 w240", displayedModeList)
+    modeBox.Choose(IndexOf(displayedModeList, modeName))
     modeBox.OnEvent("Change", ModeChanged)
 
     mainGui.AddText("x340 y116 w70", "Preset:")
@@ -292,7 +399,7 @@ BuildGui() {
     statusText := mainGui.AddText("xm y692 w980", "")
     stateText := mainGui.AddText("xm y716 w980", "")
     hotkeyText := mainGui.AddText("xm y748 w980", "Hotkeys: Ctrl+Alt+E toggle | Ctrl+Alt+R reset state | Ctrl+Alt+Q quit")
-    noteText := mainGui.AddText("xm y772 w980", "Notes: Random presets generate new settings every time. Some modes output multiple characters per letter. Pair modes such as Playfair, Hill, Bifid, Two-square, and Four-square wait for two letters before output.")
+    noteText := mainGui.AddText("xm y772 w980", "Notes: Random presets generate new settings every time. Some modes output multiple characters per letter. Pair/block modes wait until enough letters are typed, then output a chunk.")
 
     mainGui.OnEvent("Close", (*) => ExitApp())
     mainGui.OnEvent("Size", GuiResized)
@@ -304,12 +411,13 @@ BuildGui() {
 }
 
 BuildSettingsPanels(gui) {
-    global allSettingControls, enigmaPanelControls, enigmaM4OnlyControls, caesarPanelControls, keyPanelControls, affinePanelControls, substitutionPanelControls
+    global allSettingControls, enigmaPanelControls, enigmaM4OnlyControls, caesarPanelControls, keyPanelControls, affinePanelControls, substitutionPanelControls, quagmirePanelControls, quagPlainControls, quagCipherControls, quagIndicatorControls
     global thinLabel, thinBox, leftLabel, leftBox, middleLabel, middleBox, rightLabel, rightBox
     global reflectorLabel, reflectorBox, startLabel, startEdit, ringsLabel, ringsEdit, plugboardLabel, plugboardEdit
     global shiftLabel, shiftEdit, keyLabel, keyEdit, affineALabel, affineAEdit, affineBLabel, affineBEdit
     global substitutionLabel, substitutionEdit, randBtn
-    global ROTOR_NAMES, THIN_ROTOR_NAMES, REFLECTOR_M3_NAMES
+    global quagPlainLabel, quagPlainEdit, quagCipherLabel, quagCipherEdit, quagIndicatorLabel, quagIndicatorEdit, quagPositionLabel, quagPositionBox, quagHelp
+    global ROTOR_NAMES, THIN_ROTOR_NAMES, REFLECTOR_M3_NAMES, ALPHABET
 
     ; Controls are placed in the same clean settings zone.
     ; Irrelevant controls are hidden, but their positions never overlap the header row.
@@ -362,6 +470,22 @@ BuildSettingsPanels(gui) {
     keyHelp := gui.AddText("xm y246 w860", "Used by Vigenere, Autokey Vigenere, Beaufort, Porta, and Keyword substitution.")
     keyPanelControls := [keyLabel, keyEdit, keyHelp]
 
+    ; Quagmire panel
+    quagPlainLabel := gui.AddText("xm y" baseY " w130", "Plain alphabet key:")
+    quagPlainEdit := gui.AddEdit("x150 y" (baseY - 4) " w230 Uppercase", "CIPHER")
+    quagCipherLabel := gui.AddText("x410 y" baseY " w135", "Cipher alphabet key:")
+    quagCipherEdit := gui.AddEdit("x552 y" (baseY - 4) " w230 Uppercase", "MONARCHY")
+    quagIndicatorLabel := gui.AddText("xm y246 w130", "Indicator key:")
+    quagIndicatorEdit := gui.AddEdit("x150 y242 w230 Uppercase", "SECRET")
+    quagPositionLabel := gui.AddText("x410 y246 w135", "Indicator pos:")
+    quagPositionBox := gui.AddDropDownList("x552 y242 w90", StrSplit(ALPHABET))
+    quagPositionBox.Choose(1)
+    quagHelp := gui.AddText("xm y284 w920", "Quagmire uses an indicator key plus mixed alphabet keys. Quagmire IV uses separate plaintext and ciphertext alphabet keys.")
+    quagPlainControls := [quagPlainLabel, quagPlainEdit]
+    quagCipherControls := [quagCipherLabel, quagCipherEdit]
+    quagIndicatorControls := [quagIndicatorLabel, quagIndicatorEdit, quagPositionLabel, quagPositionBox]
+    quagmirePanelControls := [quagPlainLabel, quagPlainEdit, quagCipherLabel, quagCipherEdit, quagIndicatorLabel, quagIndicatorEdit, quagPositionLabel, quagPositionBox, quagHelp]
+
     ; Affine panel
     affineALabel := gui.AddText("xm y" baseY " w90", "Affine a:")
     affineAEdit := gui.AddEdit("x110 y" (baseY - 4) " w100", "5")
@@ -379,14 +503,14 @@ BuildSettingsPanels(gui) {
     substitutionPanelControls := [substitutionLabel, substitutionEdit, randBtn, substitutionHelp]
 
     allSettingControls := []
-    for _, list in [enigmaPanelControls, caesarPanelControls, keyPanelControls, affinePanelControls, substitutionPanelControls] {
+    for _, list in [enigmaPanelControls, caesarPanelControls, keyPanelControls, quagmirePanelControls, affinePanelControls, substitutionPanelControls] {
         for _, ctrl in list
             allSettingControls.Push(ctrl)
     }
 }
 
 GuiResized(thisGui, minMax, width, height) {
-    global headerText1, headerText2, settingTitleText, settingHintText, presetBox, applyPresetBtn
+    global headerText1, headerText2, settingTitleText, settingHintText, searchBox, presetBox, applyPresetBtn
     global plugboardEdit, keyEdit, substitutionEdit, randBtn
     global previewInputLabel, previewInput, previewOutputLabel, previewOutput, statusText, stateText, hotkeyText, noteText
 
@@ -568,6 +692,76 @@ BuildPresetMap() {
     m["Ogham letters"] := ["Custom", "Ogham letters"]
     m["Semaphore text"] := ["Custom", "Semaphore text"]
     m["Masonic pigpen variant"] := ["Custom", "Masonic pigpen variant"]
+    m["Progressive Vigenere"] := ["Custom", "Progressive Vigenere — LEMON", "Progressive Vigenere — CIPHER", "Progressive Vigenere — random key"]
+    m["Quagmire I"] := ["Custom", "Quagmire I — plain CIPHER indicator SECRET", "Quagmire I — plain MONARCHY indicator SEARCH", "Quagmire I — random"]
+    m["Quagmire II"] := ["Custom", "Quagmire II — cipher CIPHER indicator SECRET", "Quagmire II — cipher MONARCHY indicator SEARCH", "Quagmire II — random"]
+    m["Quagmire III"] := ["Custom", "Quagmire III — alphabet CIPHER indicator SECRET", "Quagmire III — alphabet MONARCHY indicator SEARCH", "Quagmire III — random"]
+    m["Quagmire IV"] := ["Custom", "Quagmire IV — plain CIPHER cipher MONARCHY indicator SECRET", "Quagmire IV — plain KRYPTOS cipher PALIMPSEST indicator ABSCISSA", "Quagmire IV — random"]
+    m["Alberti disk"] := ["Custom", "Alberti — CIPHER", "Alberti — MONARCHY", "Alberti — random key"]
+    m["Bellaso"] := ["Custom", "Bellaso — LEMON", "Bellaso — CIPHER", "Bellaso — random key"]
+    m["Autokey Beaufort"] := ["Custom", "Autokey Beaufort — FORT", "Autokey Beaufort — CIPHER", "Autokey Beaufort — random key"]
+    m["Progressive Porta"] := ["Custom", "Progressive Porta — PORTA", "Progressive Porta — CIPHER", "Progressive Porta — random key"]
+    m["Gronsfeld progressive"] := ["Custom", "Gronsfeld progressive — 31415", "Gronsfeld progressive — 27182", "Gronsfeld progressive — random digits"]
+    m["Keyed Atbash"] := ["Custom", "Keyed Atbash — CIPHER", "Keyed Atbash — MONARCHY", "Keyed Atbash — random key"]
+    m["Diana cipher"] := ["Custom", "Diana — SECRET", "Diana — LEMON", "Diana — random key"]
+    m["Random Caesar per letter"] := ["Custom", "Random Caesar per letter"]
+    m["Fibonacci Caesar shift"] := ["Custom", "Fibonacci Caesar shift"]
+    m["Prime Caesar shift"] := ["Custom", "Prime Caesar shift"]
+    m["Homophonic numbers"] := ["Custom", "Homophonic numbers — random"]
+    m["Base32 per letter"] := ["Custom", "Base32 per letter"]
+    m["Quoted printable"] := ["Custom", "Quoted printable"]
+    m["Decimal A0Z25"] := ["Custom", "Decimal A0Z25"]
+    m["Zero padded A1Z26"] := ["Custom", "Zero padded A1Z26"]
+    m["Octal A1Z26"] := ["Custom", "Octal A1Z26"]
+    m["Binary 6-bit index"] := ["Custom", "Binary 6-bit index"]
+    m["Coordinate 0-based"] := ["Custom", "Coordinate 0-based"]
+    m["Morse compact 01"] := ["Custom", "Morse compact 01"]
+    m["Polybius reversed"] := ["Custom", "Polybius reversed"]
+    m["Maritime signal flags"] := ["Custom", "Maritime signal flags"]
+    m["Regional indicator symbols"] := ["Custom", "Regional indicator symbols"]
+    m["Circled letters"] := ["Custom", "Circled letters"]
+    m["Squared unicode letters"] := ["Custom", "Squared unicode letters"]
+    m["Parenthesized letters"] := ["Custom", "Parenthesized letters"]
+    m["Fraktur letters"] := ["Custom", "Fraktur letters"]
+    m["Script letters"] := ["Custom", "Script letters"]
+    m["Small caps"] := ["Custom", "Small caps"]
+    m["Superscript letters"] := ["Custom", "Superscript letters"]
+    m["Subscript letters"] := ["Custom", "Subscript letters"]
+    m["Zalgo light"] := ["Custom", "Zalgo light — random marks"]
+    m["Mirror text alphabet"] := ["Custom", "Mirror text alphabet"]
+    m["Keyed Polybius square"] := ["Custom", "Keyed Polybius — CIPHER", "Keyed Polybius — MONARCHY", "Keyed Polybius — random key"]
+    m["Keyed ADFGX"] := ["Custom", "Keyed ADFGX — CIPHER", "Keyed ADFGX — PHQG", "Keyed ADFGX — random key"]
+    m["Keyed ADFGVX"] := ["Custom", "Keyed ADFGVX — CIPHER", "Keyed ADFGVX — NUMBERS", "Keyed ADFGVX — random key"]
+    m["Morbit Morse"] := ["Custom", "Morbit — 123456789", "Morbit — random digits"]
+    m["Fractionated Morse"] := ["Custom", "Fractionated Morse — CIPHER", "Fractionated Morse — SECRET", "Fractionated Morse — random key"]
+    m["Morse reverse"] := ["Custom", "Morse reverse"]
+    m["Morse emoji"] := ["Custom", "Morse emoji"]
+    m["Morse tap digits"] := ["Custom", "Morse tap digits"]
+    m["Baconian 24 I/J"] := ["Custom", "Baconian 24 I/J"]
+    m["Kamasutra substitution"] := ["Custom", "Kamasutra — alphabet halves", "Kamasutra — CIPHER", "Kamasutra — random key"]
+    m["Phillips cipher"] := ["Custom", "Phillips — PHILLIPS", "Phillips — CIPHER", "Phillips — random key"]
+    m["Slidefair pairs"] := ["Custom", "Slidefair — SLIDE", "Slidefair — CIPHER", "Slidefair — random key"]
+    m["Colemak keyboard"] := ["Custom", "Colemak keyboard"]
+    m["QWERTZ keyboard"] := ["Custom", "QWERTZ keyboard"]
+    m["Keyboard adjacent right"] := ["Custom", "Keyboard adjacent right"]
+    m["Keyboard adjacent left"] := ["Custom", "Keyboard adjacent left"]
+    m["Phone T9 digit"] := ["Custom", "Phone T9 digit"]
+    m["Phone multitap"] := ["Custom", "Phone multitap"]
+    m["Chess coordinates"] := ["Custom", "Chess coordinates"]
+    m["Dice pair code"] := ["Custom", "Dice pair code"]
+    m["Domino tile code"] := ["Custom", "Domino tile code"]
+    m["Playing card code"] := ["Custom", "Playing card code"]
+    m["Base58 index"] := ["Custom", "Base58 index"]
+    m["Base62 index"] := ["Custom", "Base62 index"]
+    m["Crockford Base32 index"] := ["Custom", "Crockford Base32 index"]
+    m["Base85 per letter"] := ["Custom", "Base85 per letter"]
+    m["UUencode per letter"] := ["Custom", "UUencode per letter"]
+    m["EBCDIC hex"] := ["Custom", "EBCDIC hex"]
+    m["UTF-8 hex"] := ["Custom", "UTF-8 hex"]
+    m["UTF-16LE hex"] := ["Custom", "UTF-16LE hex"]
+    m["HTML hex entity"] := ["Custom", "HTML hex entity"]
+    m["LCG checksum token"] := ["Custom", "LCG checksum token"]
+    m["Knuth checksum token"] := ["Custom", "Knuth checksum token"]
     m["Hex ASCII"] := ["Custom", "Hex ASCII"]
     m["ASCII decimal"] := ["Custom", "ASCII decimal"]
     m["Octal ASCII"] := ["Custom", "Octal ASCII"]
@@ -576,6 +770,25 @@ BuildPresetMap() {
     m["Greek lookalike"] := ["Custom", "Greek lookalike"]
     m["Cyrillic lookalike"] := ["Custom", "Cyrillic lookalike"]
     m["NATO words"] := ["Custom", "NATO words"]
+    m["Rail fence block"] := ["Custom", "Rail fence — rails 3", "Rail fence — rails 4", "Rail fence — random rails"]
+    m["Scytale transposition"] := ["Custom", "Scytale — width 4", "Scytale — width 5", "Scytale — random width"]
+    m["Columnar transposition block"] := ["Custom", "Columnar — ZEBRAS", "Columnar — CARGO", "Columnar — SECRET", "Columnar — random key"]
+    m["Double columnar block"] := ["Custom", "Double columnar — ZEBRAS", "Double columnar — CARGO", "Double columnar — random key"]
+    m["Route cipher block"] := ["Custom", "Route cipher — 3x3 spiral", "Route cipher — 4x4 spiral"]
+    m["Myszkowski transposition block"] := ["Custom", "Myszkowski — BALLOON", "Myszkowski — MISSISSIPPI", "Myszkowski — random key"]
+    m["Jefferson disk"] := ["Custom", "Jefferson — CIPHER", "Jefferson — PRESIDENT", "Jefferson — random key"]
+    m["M-94 cylinder style"] := ["Custom", "M-94 — CIPHER", "M-94 — ARMY", "M-94 — random key"]
+    m["Bazeries cylinder style"] := ["Custom", "Bazeries — CIPHER", "Bazeries — FRANCE", "Bazeries — random key"]
+    m["M-209 Hagelin style"] := ["Custom", "M-209 — default pins", "M-209 — random start"]
+    m["VIC checkerboard"] := ["Custom", "VIC checkerboard — ETAOIN", "VIC checkerboard — CIPHER", "VIC checkerboard — random key"]
+    m["One-time pad A-Z"] := ["Custom", "OTP — LEMON", "OTP — SECRET", "OTP — random pad"]
+    m["Vernam XOR 5-bit"] := ["Custom", "Vernam — LEMON", "Vernam — SECRET", "Vernam — random key"]
+    m["RC4 hex stream"] := ["Custom", "RC4 — KEY", "RC4 — SECRET", "RC4 — random key"]
+    m["Solitaire/Pontifex"] := ["Custom", "Solitaire — SECRET", "Solitaire — CRYPTO", "Solitaire — random key"]
+    m["Bifid full period"] := ["Custom", "Bifid full — MONARCHY", "Bifid full — CIPHER", "Bifid full — random key"]
+    m["Trifid full period"] := ["Custom", "Trifid full — TRIFID", "Trifid full — CIPHER", "Trifid full — random key"]
+    m["Nihilist numeric stream"] := ["Custom", "Nihilist numeric — CIPHER", "Nihilist numeric — MONARCHY", "Nihilist numeric — random key"]
+    m["Book cipher index"] := ["Custom", "Book cipher — NATO", "Book cipher — POE", "Book cipher — random book key"]
     return m
 }
 
@@ -594,9 +807,36 @@ RefreshPresetList(selectPreset := "Custom") {
     presetBox.Choose(IndexOf(presets, selectPreset))
 }
 
+SearchChanged(*) {
+    global searchBox
+    FilterModeList(searchBox.Value)
+}
+
+FilterModeList(query := "") {
+    global MODE_LIST, displayedModeList, modeBox, modeName
+    displayedModeList := []
+    q := StrLower(Trim(query))
+    for _, item in MODE_LIST {
+        if q = "" || InStr(StrLower(item), q)
+            displayedModeList.Push(item)
+    }
+    if displayedModeList.Length = 0
+        displayedModeList.Push("No ciphers found")
+    try modeBox.Delete()
+    modeBox.Add(displayedModeList)
+    if displayedModeList[1] = "No ciphers found" {
+        modeBox.Choose(1)
+        return
+    }
+    modeBox.Choose(IndexOf(displayedModeList, modeName))
+}
+
 ModeChanged(*) {
-    global modeBox, MODE_LIST, modeName
-    modeName := SelectedFrom(modeBox, MODE_LIST)
+    global modeBox, displayedModeList, modeName
+    selectedMode := SelectedFrom(modeBox, displayedModeList)
+    if selectedMode = "No ciphers found"
+        return
+    modeName := selectedMode
     RefreshPresetList("Custom")
     UpdateModePanel()
     ResetState()
@@ -616,8 +856,14 @@ ApplyPresetClicked(*) {
 
 ApplyPreset(preset) {
     global shiftEdit, keyEdit, affineAEdit, affineBEdit, substitutionEdit, plugboardEdit
+    global quagPlainEdit, quagCipherEdit, quagIndicatorEdit, quagPositionBox, ALPHABET
     if preset = "Custom"
         return
+
+    if InStr(preset, "Quagmire") {
+        ApplyQuagmirePreset(preset)
+        return FinishPresetApply(preset)
+    }
 
     if InStr(preset, "random preset") || InStr(preset, "random full machine") {
         if InStr(preset, "M3") {
@@ -855,6 +1101,130 @@ ApplyPreset(preset) {
         case "Keyboard Caesar random", "Vowel Caesar random", "Consonant Caesar random", "Alternating Caesar random":
             shiftEdit.Value := Random(-25, 25)
 
+        case "Progressive Vigenere — LEMON":
+            keyEdit.Value := "LEMON"
+        case "Progressive Vigenere — CIPHER":
+            keyEdit.Value := "CIPHER"
+        case "Progressive Vigenere — random key":
+            keyEdit.Value := RandomLetters(Random(5, 12))
+        case "Quagmire I — CIPHER", "Quagmire II — CIPHER", "Quagmire III — CIPHER", "Quagmire IV — CIPHER", "Alberti — CIPHER", "Bellaso — CIPHER", "Autokey Beaufort — CIPHER", "Progressive Porta — CIPHER", "Keyed Atbash — CIPHER":
+            keyEdit.Value := "CIPHER"
+        case "Quagmire I — MONARCHY", "Quagmire II — MONARCHY", "Quagmire III — MONARCHY", "Quagmire IV — MONARCHY", "Alberti — MONARCHY", "Keyed Atbash — MONARCHY":
+            keyEdit.Value := "MONARCHY"
+        case "Bellaso — LEMON":
+            keyEdit.Value := "LEMON"
+        case "Autokey Beaufort — FORT":
+            keyEdit.Value := "FORT"
+        case "Progressive Porta — PORTA":
+            keyEdit.Value := "PORTA"
+        case "Gronsfeld progressive — 31415":
+            keyEdit.Value := "31415"
+        case "Gronsfeld progressive — 27182":
+            keyEdit.Value := "27182"
+        case "Gronsfeld progressive — random digits":
+            keyEdit.Value := RandomDigits(Random(4, 10))
+        case "Quagmire I — random key", "Quagmire II — random key", "Quagmire III — random key", "Quagmire IV — random key", "Alberti — random key", "Bellaso — random key", "Autokey Beaufort — random key", "Progressive Porta — random key", "Keyed Atbash — random key":
+            keyEdit.Value := RandomLetters(Random(5, 12))
+        case "Diana — SECRET":
+            keyEdit.Value := "SECRET"
+        case "Diana — LEMON":
+            keyEdit.Value := "LEMON"
+        case "Diana — random key":
+            keyEdit.Value := RandomLetters(Random(8, 16))
+
+        case "Keyed Polybius — CIPHER", "Keyed ADFGX — CIPHER", "Keyed ADFGVX — CIPHER", "Fractionated Morse — CIPHER", "Kamasutra — CIPHER", "Phillips — CIPHER", "Slidefair — CIPHER":
+            keyEdit.Value := "CIPHER"
+        case "Keyed Polybius — MONARCHY":
+            keyEdit.Value := "MONARCHY"
+        case "Keyed ADFGX — PHQG":
+            keyEdit.Value := "PHQGIUMEAYLNOFDXKRCVSTZWB"
+        case "Keyed ADFGVX — NUMBERS":
+            keyEdit.Value := "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        case "Morbit — 123456789":
+            keyEdit.Value := "123456789"
+        case "Morbit — random digits":
+            keyEdit.Value := RandomDigitPermutation(9)
+        case "Fractionated Morse — SECRET":
+            keyEdit.Value := "SECRET"
+        case "Kamasutra — alphabet halves":
+            keyEdit.Value := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        case "Phillips — PHILLIPS":
+            keyEdit.Value := "PHILLIPS"
+        case "Slidefair — SLIDE":
+            keyEdit.Value := "SLIDE"
+        case "Keyed Polybius — random key", "Keyed ADFGX — random key", "Keyed ADFGVX — random key", "Fractionated Morse — random key", "Kamasutra — random key", "Phillips — random key", "Slidefair — random key":
+            keyEdit.Value := RandomLetters(Random(5, 12))
+
+        case "Rail fence — rails 3":
+            shiftEdit.Value := "3"
+        case "Rail fence — rails 4":
+            shiftEdit.Value := "4"
+        case "Rail fence — random rails":
+            shiftEdit.Value := Random(2, 6)
+        case "Scytale — width 4":
+            shiftEdit.Value := "4"
+        case "Scytale — width 5":
+            shiftEdit.Value := "5"
+        case "Scytale — random width":
+            shiftEdit.Value := Random(3, 8)
+        case "Columnar — ZEBRAS", "Double columnar — ZEBRAS":
+            keyEdit.Value := "ZEBRAS"
+        case "Columnar — CARGO", "Double columnar — CARGO":
+            keyEdit.Value := "CARGO"
+        case "Columnar — SECRET":
+            keyEdit.Value := "SECRET"
+        case "Columnar — random key", "Double columnar — random key":
+            keyEdit.Value := RandomLetters(Random(5, 10))
+        case "Route cipher — 3x3 spiral":
+            shiftEdit.Value := "3"
+        case "Route cipher — 4x4 spiral":
+            shiftEdit.Value := "4"
+        case "Myszkowski — BALLOON":
+            keyEdit.Value := "BALLOON"
+        case "Myszkowski — MISSISSIPPI":
+            keyEdit.Value := "MISSISSIPPI"
+        case "Myszkowski — random key":
+            keyEdit.Value := RandomLetters(Random(6, 11))
+        case "Jefferson — CIPHER", "M-94 — CIPHER", "Bazeries — CIPHER", "VIC checkerboard — CIPHER", "Bifid full — CIPHER", "Trifid full — CIPHER", "Nihilist numeric — CIPHER":
+            keyEdit.Value := "CIPHER"
+        case "Jefferson — PRESIDENT":
+            keyEdit.Value := "PRESIDENT"
+        case "M-94 — ARMY":
+            keyEdit.Value := "ARMY"
+        case "Bazeries — FRANCE":
+            keyEdit.Value := "FRANCE"
+        case "Jefferson — random key", "M-94 — random key", "Bazeries — random key", "VIC checkerboard — random key", "Bifid full — random key", "Trifid full — random key", "Nihilist numeric — random key":
+            keyEdit.Value := RandomLetters(Random(5, 14))
+        case "M-209 — default pins":
+            keyEdit.Value := "HAGELIN"
+        case "M-209 — random start":
+            keyEdit.Value := RandomLetters(Random(6, 12))
+            shiftEdit.Value := Random(0, 25)
+        case "VIC checkerboard — ETAOIN":
+            keyEdit.Value := "ETAOINSHRDLU"
+        case "OTP — LEMON", "Vernam — LEMON":
+            keyEdit.Value := "LEMON"
+        case "OTP — SECRET", "Vernam — SECRET", "RC4 — SECRET", "Solitaire — SECRET":
+            keyEdit.Value := "SECRET"
+        case "OTP — random pad":
+            keyEdit.Value := RandomLetters(Random(20, 40))
+        case "Vernam — random key", "RC4 — random key", "Solitaire — random key":
+            keyEdit.Value := RandomLetters(Random(6, 16))
+        case "RC4 — KEY":
+            keyEdit.Value := "KEY"
+        case "Solitaire — CRYPTO":
+            keyEdit.Value := "CRYPTO"
+        case "Bifid full — MONARCHY", "Nihilist numeric — MONARCHY":
+            keyEdit.Value := "MONARCHY"
+        case "Trifid full — TRIFID":
+            keyEdit.Value := "TRIFID"
+        case "Book cipher — NATO":
+            keyEdit.Value := "ALPHA BRAVO CHARLIE DELTA ECHO FOXTROT GOLF HOTEL INDIA JULIET KILO LIMA MIKE NOVEMBER OSCAR PAPA QUEBEC ROMEO SIERRA TANGO UNIFORM VICTOR WHISKEY XRAY YANKEE ZULU"
+        case "Book cipher — POE":
+            keyEdit.Value := "ONCE UPON A MIDNIGHT DREARY WHILE I PONDERED WEAK AND WEARY"
+        case "Book cipher — random book key":
+            keyEdit.Value := RandomLetters(Random(12, 24))
+
         case "Random substitution — random 1", "Random substitution — random 2", "Random substitution — random 3", "Random substitution — random now":
             substitutionEdit.Value := RandomAlphabet()
         case "Random substitution — QWERTY fixed":
@@ -875,11 +1245,13 @@ FinishPresetApply(preset) {
 }
 
 SetEnigmaPreset(model, thin, left, middle, right, reflector, start, rings, plugPairs) {
-    global modeName, modeBox, MODE_LIST, thinBox, leftBox, middleBox, rightBox, reflectorBox, startEdit, ringsEdit, plugboardEdit
+    global modeName, searchBox, modeBox, displayedModeList, thinBox, leftBox, middleBox, rightBox, reflectorBox, startEdit, ringsEdit, plugboardEdit
     global THIN_ROTOR_NAMES, ROTOR_NAMES
 
     modeName := model
-    modeBox.Choose(IndexOf(MODE_LIST, model))
+    searchBox.Value := ""
+    FilterModeList("")
+    modeBox.Choose(IndexOf(displayedModeList, model))
     UpdateModePanel()
 
     thinBox.Choose(IndexOf(THIN_ROTOR_NAMES, thin))
@@ -891,6 +1263,55 @@ SetEnigmaPreset(model, thin, left, middle, right, reflector, start, rings, plugP
     startEdit.Value := start
     ringsEdit.Value := rings
     plugboardEdit.Value := plugPairs
+}
+
+
+ApplyQuagmirePreset(preset) {
+    global modeName, searchBox, modeBox, displayedModeList
+    global quagPlainEdit, quagCipherEdit, quagIndicatorEdit, quagPositionBox, ALPHABET
+
+    if InStr(preset, "Quagmire I")
+        modeName := "Quagmire I"
+    else if InStr(preset, "Quagmire II")
+        modeName := "Quagmire II"
+    else if InStr(preset, "Quagmire III")
+        modeName := "Quagmire III"
+    else
+        modeName := "Quagmire IV"
+
+    searchBox.Value := ""
+    FilterModeList("")
+    modeBox.Choose(IndexOf(displayedModeList, modeName))
+    UpdateModePanel()
+
+    if InStr(preset, "random") {
+        quagPlainEdit.Value := RandomLetters(Random(5, 12))
+        quagCipherEdit.Value := RandomLetters(Random(5, 12))
+        quagIndicatorEdit.Value := RandomLetters(Random(5, 10))
+        quagPositionBox.Choose(Random(1, 26))
+        return
+    }
+
+    if InStr(preset, "KRYPTOS") {
+        quagPlainEdit.Value := "KRYPTOS"
+        quagCipherEdit.Value := "PALIMPSEST"
+        quagIndicatorEdit.Value := "ABSCISSA"
+        quagPositionBox.Choose(IndexOf(StrSplit(ALPHABET), "K"))
+        return
+    }
+
+    if InStr(preset, "MONARCHY") {
+        quagPlainEdit.Value := "MONARCHY"
+        quagCipherEdit.Value := "MONARCHY"
+        quagIndicatorEdit.Value := "SEARCH"
+        quagPositionBox.Choose(1)
+        return
+    }
+
+    quagPlainEdit.Value := "CIPHER"
+    quagCipherEdit.Value := "MONARCHY"
+    quagIndicatorEdit.Value := "SECRET"
+    quagPositionBox.Choose(1)
 }
 
 ApplyRandomEnigmaPreset(model) {
@@ -957,7 +1378,7 @@ RandomDigits(length) {
 ; ------------------------------------------------------------
 
 UpdateModePanel() {
-    global modeName, allSettingControls, enigmaPanelControls, enigmaM4OnlyControls, caesarPanelControls, keyPanelControls, affinePanelControls, substitutionPanelControls
+    global modeName, allSettingControls, enigmaPanelControls, enigmaM4OnlyControls, caesarPanelControls, keyPanelControls, affinePanelControls, substitutionPanelControls, quagmirePanelControls, quagPlainControls, quagCipherControls, quagIndicatorControls
     global settingHintText
 
     SetControlsVisible(allSettingControls, false)
@@ -970,10 +1391,25 @@ UpdateModePanel() {
             settingHintText.Value := "Enigma M4 settings: thin rotor, three stepping rotors, thin reflector, ring settings, start positions, and plugboard."
         else
             settingHintText.Value := "Enigma M3 settings: three stepping rotors, standard reflector, ring settings, start positions, and plugboard."
-    } else if modeName = "Caesar" || modeName = "Progressive Caesar" || modeName = "Trithemius" || modeName = "Keyboard Caesar" || modeName = "Vowel Caesar" || modeName = "Consonant Caesar" || modeName = "Alternating Caesar" {
+    } else if modeName = "Caesar" || modeName = "Progressive Caesar" || modeName = "Trithemius" || modeName = "Keyboard Caesar" || modeName = "Vowel Caesar" || modeName = "Consonant Caesar" || modeName = "Alternating Caesar" || modeName = "Rail fence block" || modeName = "Scytale transposition" || modeName = "Route cipher block" || modeName = "M-209 Hagelin style" {
         SetControlsVisible(caesarPanelControls, true)
         settingHintText.Value := "Shift settings: Caesar uses a fixed shift; Progressive Caesar and Trithemius use this as the starting shift."
-    } else if modeName = "Vigenere" || modeName = "Autokey Vigenere" || modeName = "Gronsfeld" || modeName = "Running Key Vigenere" || modeName = "Beaufort" || modeName = "Variant Beaufort" || modeName = "Porta" || modeName = "Keyword substitution" || modeName = "XOR hex with key" || modeName = "XOR binary with key" || modeName = "Condi" || modeName = "Playfair pairs" || modeName = "Bifid pairs" || modeName = "Two-square pairs" || modeName = "Four-square pairs" || modeName = "Nihilist substitution" {
+    } else if IsQuagmireMode(modeName) {
+        SetControlsVisible(quagmirePanelControls, true)
+        ; Hide unused Quagmire alphabet fields per variant.
+        if modeName = "Quagmire I" {
+            SetControlsVisible(quagCipherControls, false)
+            settingHintText.Value := "Quagmire I: keyed plaintext alphabet + normal ciphertext alphabet + indicator key/position."
+        } else if modeName = "Quagmire II" {
+            SetControlsVisible(quagPlainControls, false)
+            settingHintText.Value := "Quagmire II: normal plaintext alphabet + keyed ciphertext alphabet + indicator key/position."
+        } else if modeName = "Quagmire III" {
+            SetControlsVisible(quagCipherControls, false)
+            settingHintText.Value := "Quagmire III: keyed alphabet + indicator key/position."
+        } else {
+            settingHintText.Value := "Quagmire IV: separate plaintext alphabet key, ciphertext alphabet key, indicator key, and indicator position."
+        }
+    } else if modeName = "Vigenere" || modeName = "Autokey Vigenere" || modeName = "Gronsfeld" || modeName = "Running Key Vigenere" || modeName = "Beaufort" || modeName = "Variant Beaufort" || modeName = "Porta" || modeName = "Keyword substitution" || modeName = "XOR hex with key" || modeName = "XOR binary with key" || modeName = "Condi" || modeName = "Playfair pairs" || modeName = "Bifid pairs" || modeName = "Two-square pairs" || modeName = "Four-square pairs" || modeName = "Nihilist substitution" || modeName = "Progressive Vigenere" || modeName = "Quagmire I" || modeName = "Quagmire II" || modeName = "Quagmire III" || modeName = "Quagmire IV" || modeName = "Alberti disk" || modeName = "Bellaso" || modeName = "Autokey Beaufort" || modeName = "Progressive Porta" || modeName = "Gronsfeld progressive" || modeName = "Keyed Atbash" || modeName = "Diana cipher" || modeName = "Keyed Polybius square" || modeName = "Keyed ADFGX" || modeName = "Keyed ADFGVX" || modeName = "Morbit Morse" || modeName = "Fractionated Morse" || modeName = "Kamasutra substitution" || modeName = "Phillips cipher" || modeName = "Slidefair pairs" || modeName = "Columnar transposition block" || modeName = "Double columnar block" || modeName = "Myszkowski transposition block" || modeName = "Jefferson disk" || modeName = "M-94 cylinder style" || modeName = "Bazeries cylinder style" || modeName = "VIC checkerboard" || modeName = "One-time pad A-Z" || modeName = "Vernam XOR 5-bit" || modeName = "RC4 hex stream" || modeName = "Solitaire/Pontifex" || modeName = "Bifid full period" || modeName = "Trifid full period" || modeName = "Nihilist numeric stream" || modeName = "Book cipher index" {
         SetControlsVisible(keyPanelControls, true)
         settingHintText.Value := "Key settings: this cipher only uses the key field. Gronsfeld expects digits; XOR uses the key bytes; the others expect letters."
     } else if modeName = "Affine" {
@@ -1031,13 +1467,16 @@ ApplySettingsClicked(*) {
 }
 
 ApplySettingsCore(showTip := true) {
-    global modeBox, MODE_LIST, modeName, enabled, enableBox, autoResetBox, autoResetOnEnable
+    global searchBox, modeBox, displayedModeList, modeName, enabled, enableBox, autoResetBox, autoResetOnEnable
     global thinBox, leftBox, middleBox, rightBox, reflectorBox, startEdit, ringsEdit, plugboardEdit
     global THIN_ROTOR_NAMES, ROTOR_NAMES, enigmaThin, enigmaLeft, enigmaMiddle, enigmaRight, enigmaReflector, enigmaStart, enigmaRings, plugboardPairs, plugboard
     global shiftEdit, keyEdit, affineAEdit, affineBEdit, substitutionEdit, outputModeBox
+    global quagPlainEdit, quagCipherEdit, quagIndicatorEdit, quagPositionBox, quagPlainKey, quagCipherKey, quagIndicatorKey, quagIndicatorPos, ALPHABET
     global shiftValue, keyText, affineA, affineB, substitutionAlphabet, outputMode
 
-    modeName := SelectedFrom(modeBox, MODE_LIST)
+    selectedMode := SelectedFrom(modeBox, displayedModeList)
+    if selectedMode != "No ciphers found"
+        modeName := selectedMode
     UpdateModePanel()
 
     enigmaThin := SelectedFrom(thinBox, THIN_ROTOR_NAMES)
@@ -1059,22 +1498,44 @@ ApplySettingsCore(showTip := true) {
     shiftEdit.Value := shiftValue
 
     keyText := keyEdit.Value
-    if modeName = "Gronsfeld" {
+    if modeName = "Gronsfeld" || modeName = "Gronsfeld progressive" {
         if CleanDigits(keyText) = "" {
             keyText := "31415"
             keyEdit.Value := keyText
         }
-    } else if modeName = "Vigenere" || modeName = "Autokey Vigenere" || modeName = "Running Key Vigenere" || modeName = "Beaufort" || modeName = "Variant Beaufort" || modeName = "Porta" || modeName = "Keyword substitution" || modeName = "Condi" || modeName = "Playfair pairs" || modeName = "Bifid pairs" || modeName = "Two-square pairs" || modeName = "Four-square pairs" || modeName = "Nihilist substitution" {
+    } else if modeName = "Morbit Morse" {
+        if CleanDigits(keyText) = "" {
+            keyText := "123456789"
+            keyEdit.Value := keyText
+        }
+    } else if modeName = "Vigenere" || modeName = "Autokey Vigenere" || modeName = "Running Key Vigenere" || modeName = "Beaufort" || modeName = "Variant Beaufort" || modeName = "Porta" || modeName = "Keyword substitution" || modeName = "Condi" || modeName = "Playfair pairs" || modeName = "Bifid pairs" || modeName = "Two-square pairs" || modeName = "Four-square pairs" || modeName = "Nihilist substitution" || modeName = "Progressive Vigenere" || modeName = "Quagmire I" || modeName = "Quagmire II" || modeName = "Quagmire III" || modeName = "Quagmire IV" || modeName = "Alberti disk" || modeName = "Bellaso" || modeName = "Autokey Beaufort" || modeName = "Progressive Porta" || modeName = "Gronsfeld progressive" || modeName = "Keyed Atbash" || modeName = "Diana cipher" || modeName = "Keyed Polybius square" || modeName = "Keyed ADFGX" || modeName = "Keyed ADFGVX" || modeName = "Fractionated Morse" || modeName = "Kamasutra substitution" || modeName = "Phillips cipher" || modeName = "Slidefair pairs" || modeName = "Columnar transposition block" || modeName = "Double columnar block" || modeName = "Myszkowski transposition block" || modeName = "Jefferson disk" || modeName = "M-94 cylinder style" || modeName = "Bazeries cylinder style" || modeName = "VIC checkerboard" || modeName = "One-time pad A-Z" || modeName = "Vernam XOR 5-bit" || modeName = "RC4 hex stream" || modeName = "Solitaire/Pontifex" || modeName = "Bifid full period" || modeName = "Trifid full period" || modeName = "Nihilist numeric stream" || modeName = "Book cipher index" {
         if CleanLetters(keyText) = "" {
             keyText := "KEY"
             keyEdit.Value := keyText
         }
-    } else if modeName = "XOR hex with key" || modeName = "XOR binary with key" {
+    } else if modeName = "XOR hex with key" || modeName = "XOR binary with key" || modeName = "RC4 hex stream" {
         if keyText = "" {
             keyText := "KEY"
             keyEdit.Value := keyText
         }
     }
+
+    quagPlainKey := CleanLetters(quagPlainEdit.Value)
+    if quagPlainKey = ""
+        quagPlainKey := "CIPHER"
+    quagPlainEdit.Value := quagPlainKey
+
+    quagCipherKey := CleanLetters(quagCipherEdit.Value)
+    if quagCipherKey = ""
+        quagCipherKey := "MONARCHY"
+    quagCipherEdit.Value := quagCipherKey
+
+    quagIndicatorKey := CleanLetters(quagIndicatorEdit.Value)
+    if quagIndicatorKey = ""
+        quagIndicatorKey := "SECRET"
+    quagIndicatorEdit.Value := quagIndicatorKey
+
+    quagIndicatorPos := SelectedFrom(quagPositionBox, StrSplit(ALPHABET))
 
     affineA := ToIntegerOrDefault(affineAEdit.Value, 5)
     affineB := ToIntegerOrDefault(affineBEdit.Value, 8)
@@ -1172,7 +1633,7 @@ ResetStateFromHotkey() {
 }
 
 ResetState() {
-    global rotorPositions, enigmaStart, streamIndex, autoKeyHistory, pairBuffer, condiShift, chaosLeft, chaosRight, chaosLeftDefault, chaosRightDefault
+    global rotorPositions, enigmaStart, streamIndex, autoKeyHistory, pairBuffer, condiShift, chaosLeft, chaosRight, chaosLeftDefault, chaosRightDefault, keyText
     rotorPositions := StrSplit(enigmaStart)
     streamIndex := 0
     autoKeyHistory := ""
@@ -1180,6 +1641,8 @@ ResetState() {
     condiShift := 0
     chaosLeft := chaosLeftDefault
     chaosRight := chaosRightDefault
+    InitSolitaireDeck(keyText)
+    InitRC4(keyText)
 }
 
 UpdateStatus() {
@@ -1398,6 +1861,148 @@ EncryptLetterByMode(letter) {
             return SemaphoreTextLetter(letter)
         case "Masonic pigpen variant":
             return MasonicPigpenVariantLetter(letter)
+        case "Progressive Vigenere":
+            shift := KeyShiftAt(keyText, streamIndex) + streamIndex
+            streamIndex += 1
+            return ShiftLetter(letter, shift)
+        case "Quagmire I":
+            return QuagmireLetter(letter, 1)
+        case "Quagmire II":
+            return QuagmireLetter(letter, 2)
+        case "Quagmire III":
+            return QuagmireLetter(letter, 3)
+        case "Quagmire IV":
+            return QuagmireLetter(letter, 4)
+        case "Alberti disk":
+            return AlbertiDiskLetter(letter)
+        case "Bellaso":
+            return BellasoLetter(letter)
+        case "Autokey Beaufort":
+            return AutokeyBeaufortLetter(letter)
+        case "Progressive Porta":
+            return ProgressivePortaLetter(letter)
+        case "Gronsfeld progressive":
+            return GronsfeldProgressiveLetter(letter)
+        case "Keyed Atbash":
+            return KeyedAtbashLetter(letter)
+        case "Diana cipher":
+            return DianaLetter(letter)
+        case "Random Caesar per letter":
+            return ShiftLetter(letter, Random(1, 25))
+        case "Fibonacci Caesar shift":
+            return FibonacciCaesarShiftLetter(letter)
+        case "Prime Caesar shift":
+            return PrimeCaesarShiftLetter(letter)
+        case "Homophonic numbers":
+            return HomophonicNumberLetter(letter)
+        case "Base32 per letter":
+            return Base32PerLetter(letter)
+        case "Quoted printable":
+            return QuotedPrintableLetter(letter)
+        case "Decimal A0Z25":
+            return DecimalA0Z25Letter(letter)
+        case "Zero padded A1Z26":
+            return ZeroPaddedA1Z26Letter(letter)
+        case "Octal A1Z26":
+            return OctalA1Z26Letter(letter)
+        case "Binary 6-bit index":
+            return Binary6IndexLetter(letter)
+        case "Coordinate 0-based":
+            return Coordinate0BasedLetter(letter)
+        case "Morse compact 01":
+            return MorseCompact01Letter(letter)
+        case "Polybius reversed":
+            return PolybiusReversedLetter(letter)
+        case "Maritime signal flags":
+            return MaritimeFlagLetter(letter)
+        case "Regional indicator symbols":
+            return RegionalIndicatorLetter(letter)
+        case "Circled letters":
+            return CircledLetter(letter)
+        case "Squared unicode letters":
+            return SquaredUnicodeLetter(letter)
+        case "Parenthesized letters":
+            return ParenthesizedLetter(letter)
+        case "Fraktur letters":
+            return FrakturLetter(letter)
+        case "Script letters":
+            return ScriptLetter(letter)
+        case "Small caps":
+            return SmallCapsLetter(letter)
+        case "Superscript letters":
+            return SuperscriptLetter(letter)
+        case "Subscript letters":
+            return SubscriptLetter(letter)
+        case "Zalgo light":
+            return ZalgoLightLetter(letter)
+        case "Mirror text alphabet":
+            return MirrorTextAlphabetLetter(letter)
+        case "Keyed Polybius square":
+            return KeyedPolybiusLetter(letter)
+        case "Keyed ADFGX":
+            return KeyedADFGXLetter(letter)
+        case "Keyed ADFGVX":
+            return KeyedADFGVXLetter(letter)
+        case "Morbit Morse":
+            return MorbitMorseLetter(letter)
+        case "Fractionated Morse":
+            return FractionatedMorseLetter(letter)
+        case "Morse reverse":
+            return MorseReverseLetter(letter)
+        case "Morse emoji":
+            return MorseEmojiLetter(letter)
+        case "Morse tap digits":
+            return MorseTapDigitsLetter(letter)
+        case "Baconian 24 I/J":
+            return Baconian24Letter(letter)
+        case "Kamasutra substitution":
+            return KamasutraLetter(letter)
+        case "Phillips cipher":
+            return PhillipsLetter(letter)
+        case "Slidefair pairs":
+            return SlidefairLetter(letter)
+        case "Colemak keyboard":
+            return ColemakLetter(letter)
+        case "QWERTZ keyboard":
+            return QwertzLetter(letter)
+        case "Keyboard adjacent right":
+            return KeyboardAdjacentRightLetter(letter)
+        case "Keyboard adjacent left":
+            return KeyboardAdjacentLeftLetter(letter)
+        case "Phone T9 digit":
+            return PhoneT9DigitLetter(letter)
+        case "Phone multitap":
+            return PhoneMultitapLetter(letter)
+        case "Chess coordinates":
+            return ChessCoordinateLetter(letter)
+        case "Dice pair code":
+            return DicePairCodeLetter(letter)
+        case "Domino tile code":
+            return DominoTileCodeLetter(letter)
+        case "Playing card code":
+            return PlayingCardCodeLetter(letter)
+        case "Base58 index":
+            return Base58IndexLetter(letter)
+        case "Base62 index":
+            return Base62IndexLetter(letter)
+        case "Crockford Base32 index":
+            return CrockfordBase32IndexLetter(letter)
+        case "Base85 per letter":
+            return Base85PerLetter(letter)
+        case "UUencode per letter":
+            return UuencodePerLetter(letter)
+        case "EBCDIC hex":
+            return EBCDICHexLetter(letter)
+        case "UTF-8 hex":
+            return Utf8HexLetter(letter)
+        case "UTF-16LE hex":
+            return Utf16LEHexLetter(letter)
+        case "HTML hex entity":
+            return HtmlHexEntityLetter(letter)
+        case "LCG checksum token":
+            return LCGChecksumTokenLetter(letter)
+        case "Knuth checksum token":
+            return KnuthChecksumTokenLetter(letter)
         case "Hex ASCII":
             return HexAsciiLetter(letter)
         case "ASCII decimal":
@@ -1412,6 +2017,44 @@ EncryptLetterByMode(letter) {
             return GreekLookalikeLetter(letter)
         case "Cyrillic lookalike":
             return CyrillicLookalikeLetter(letter)
+        case "Rail fence block":
+            return RailFenceBlockLetter(letter)
+        case "Scytale transposition":
+            return ScytaleBlockLetter(letter)
+        case "Columnar transposition block":
+            return ColumnarBlockLetter(letter)
+        case "Double columnar block":
+            return DoubleColumnarBlockLetter(letter)
+        case "Route cipher block":
+            return RouteCipherBlockLetter(letter)
+        case "Myszkowski transposition block":
+            return MyszkowskiBlockLetter(letter)
+        case "Jefferson disk":
+            return JeffersonDiskLetter(letter)
+        case "M-94 cylinder style":
+            return M94CylinderLetter(letter)
+        case "Bazeries cylinder style":
+            return BazeriesCylinderLetter(letter)
+        case "M-209 Hagelin style":
+            return M209HagelinLetter(letter)
+        case "VIC checkerboard":
+            return VICCheckerboardLetter(letter)
+        case "One-time pad A-Z":
+            return OneTimePadLetter(letter)
+        case "Vernam XOR 5-bit":
+            return VernamXor5BitLetter(letter)
+        case "RC4 hex stream":
+            return RC4HexStreamLetter(letter)
+        case "Solitaire/Pontifex":
+            return SolitairePontifexLetter(letter)
+        case "Bifid full period":
+            return BifidFullPeriodLetter(letter)
+        case "Trifid full period":
+            return TrifidFullPeriodLetter(letter)
+        case "Nihilist numeric stream":
+            return NihilistNumericStreamLetter(letter)
+        case "Book cipher index":
+            return BookCipherIndexLetter(letter)
         case "NATO words":
             return NatoLetter(letter)
     }
@@ -2019,19 +2662,37 @@ FlushPendingByMode() {
     global modeName, pairBuffer
     if pairBuffer = ""
         return ""
-    a := pairBuffer
+    block := pairBuffer
     pairBuffer := ""
     switch modeName {
         case "Playfair pairs":
-            return PlayfairEncryptPair(a, "X", true)
+            return PlayfairEncryptPair(block, "X", true)
         case "Hill 2x2 pairs":
-            return Hill2x2EncryptPair(a, "X", true)
+            return Hill2x2EncryptPair(block, "X", true)
         case "Bifid pairs":
-            return BifidEncryptPair(a, "X", true)
+            return BifidEncryptPair(block, "X", true)
         case "Two-square pairs":
-            return TwoSquareEncryptPair(a, "X", true)
+            return TwoSquareEncryptPair(block, "X", true)
         case "Four-square pairs":
-            return FourSquareEncryptPair(a, "X", true)
+            return FourSquareEncryptPair(block, "X", true)
+        case "Slidefair pairs":
+            return SlidefairEncryptPair(block, "X", true)
+        case "Rail fence block":
+            return EncryptNamedBlock(PadRight(block, 10, "X"), "Rail") . " "
+        case "Scytale transposition":
+            return EncryptNamedBlock(PadRight(block, 8, "X"), "Scytale") . " "
+        case "Columnar transposition block":
+            return EncryptNamedBlock(PadRight(block, 10, "X"), "Columnar") . " "
+        case "Double columnar block":
+            return EncryptNamedBlock(PadRight(block, 12, "X"), "DoubleColumnar") . " "
+        case "Route cipher block":
+            return EncryptNamedBlock(PadRight(block, RouteBlockSize(), "X"), "Route") . " "
+        case "Myszkowski transposition block":
+            return EncryptNamedBlock(PadRight(block, 12, "X"), "Myszkowski") . " "
+        case "Bifid full period":
+            return EncryptNamedBlock(PadRight(block, 10, "X"), "BifidFull") . " "
+        case "Trifid full period":
+            return EncryptNamedBlock(PadRight(block, 9, "X"), "TrifidFull") . " "
     }
     return ""
 }
@@ -2374,6 +3035,322 @@ MasonicPigpenVariantLetter(letter) {
     return symbols.Has(u) ? symbols[u] . " " : letter
 }
 
+
+
+QuagmireILetter(letter) {
+    return QuagmireLetter(letter, 1)
+}
+
+IsQuagmireMode(mode) {
+    return mode = "Quagmire I" || mode = "Quagmire II" || mode = "Quagmire III" || mode = "Quagmire IV"
+}
+
+QuagmireLetter(letter, variant) {
+    global quagPlainKey, quagCipherKey, quagIndicatorKey, quagIndicatorPos, streamIndex, ALPHABET
+
+    plainKey := CleanLetters(quagPlainKey)
+    if plainKey = ""
+        plainKey := "CIPHER"
+
+    cipherKey := CleanLetters(quagCipherKey)
+    if cipherKey = ""
+        cipherKey := "MONARCHY"
+
+    indicator := CleanLetters(quagIndicatorKey)
+    if indicator = ""
+        indicator := "SECRET"
+
+    indicatorPos := SubStr(CleanLetters(quagIndicatorPos), 1, 1)
+    if indicatorPos = ""
+        indicatorPos := "A"
+
+    ; Quagmire variants as periodic mixed-alphabet substitutions:
+    ; I   = keyed plaintext alphabet + normal ciphertext alphabet + indicator key
+    ; II  = normal plaintext alphabet + keyed ciphertext alphabet + indicator key
+    ; III = keyed plaintext alphabet + same keyed ciphertext alphabet + indicator key
+    ; IV  = keyed plaintext alphabet + separate keyed ciphertext alphabet + indicator key
+    if variant = 1 {
+        plainAlphabet := KeywordAlphabet(plainKey)
+        cipherAlphabet := ALPHABET
+    } else if variant = 2 {
+        plainAlphabet := ALPHABET
+        cipherAlphabet := KeywordAlphabet(cipherKey)
+    } else if variant = 3 {
+        plainAlphabet := KeywordAlphabet(plainKey)
+        cipherAlphabet := KeywordAlphabet(plainKey)
+    } else {
+        plainAlphabet := KeywordAlphabet(plainKey)
+        cipherAlphabet := KeywordAlphabet(cipherKey)
+    }
+
+    indChar := SubStr(indicator, Mod(streamIndex, StrLen(indicator)) + 1, 1)
+    posCipherIndicator := InStr(cipherAlphabet, indChar)
+    posPlainIndicator := InStr(plainAlphabet, indicatorPos)
+    if posCipherIndicator <= 0
+        posCipherIndicator := 1
+    if posPlainIndicator <= 0
+        posPlainIndicator := 1
+
+    shift := (posCipherIndicator - posPlainIndicator)
+    rowAlphabet := ShiftedAlphabet(cipherAlphabet, shift)
+    streamIndex += 1
+    return SubstituteBetweenAlphabets(letter, plainAlphabet, rowAlphabet)
+}
+
+SubstituteBetweenAlphabets(letter, sourceAlphabet, targetAlphabet) {
+    u := StrUpper(letter)
+    pos := InStr(sourceAlphabet, u)
+    if pos <= 0
+        return letter
+    mapped := SubStr(targetAlphabet, pos, 1)
+    return IsUpperLetter(letter) ? mapped : StrLower(mapped)
+}
+
+ShiftedAlphabet(alphabet, shift) {
+    shift := PositiveMod(shift, StrLen(alphabet))
+    return SubStr(alphabet, shift + 1) . SubStr(alphabet, 1, shift)
+}
+
+ReverseString(text) {
+    out := ""
+    for _, ch in StrSplit(text)
+        out := ch . out
+    return out
+}
+
+AlbertiDiskLetter(letter) {
+    global keyText, streamIndex, ALPHABET
+    disk := KeywordAlphabet(keyText)
+    ; Rotating cipher disk; the disk advances one position per typed letter.
+    target := ShiftedAlphabet(disk, streamIndex)
+    streamIndex += 1
+    return SubstituteBetweenAlphabets(letter, ALPHABET, target)
+}
+
+BellasoLetter(letter) {
+    global keyText, streamIndex
+    ; Bellaso-style reciprocal/Vigenere-like shifting with a keyed stream.
+    shift := KeyShiftAt(keyText, streamIndex) + Floor(streamIndex / Max(1, StrLen(CleanLetters(keyText))))
+    streamIndex += 1
+    return ShiftLetter(letter, shift)
+}
+
+AutokeyBeaufortLetter(letter) {
+    global keyText, streamIndex, autoKeyHistory
+    if streamIndex < StrLen(CleanLetters(keyText))
+        shift := KeyShiftAt(keyText, streamIndex)
+    else
+        shift := KeyShiftAt(autoKeyHistory = "" ? "A" : autoKeyHistory, streamIndex - StrLen(CleanLetters(keyText)))
+    p := LetterIndex(StrUpper(letter))
+    c := PositiveMod(shift - p, 26)
+    autoKeyHistory .= StrUpper(letter)
+    streamIndex += 1
+    return LetterFromIndex(c, IsUpperLetter(letter))
+}
+
+ProgressivePortaLetter(letter) {
+    global keyText, streamIndex
+    kidx := Floor(KeyShiftAt(keyText, streamIndex) / 2) + streamIndex
+    streamIndex += 1
+    x := LetterIndex(StrUpper(letter))
+    if x < 13
+        y := PositiveMod(x + 13 - kidx, 13) + 13
+    else
+        y := PositiveMod(x - 13 + kidx, 13)
+    return LetterFromIndex(y, IsUpperLetter(letter))
+}
+
+GronsfeldProgressiveLetter(letter) {
+    global keyText, streamIndex
+    digits := CleanDigits(keyText)
+    if digits = ""
+        digits := "31415"
+    d := SubStr(digits, PositiveMod(streamIndex, StrLen(digits)) + 1, 1) + 0
+    shift := d + streamIndex
+    streamIndex += 1
+    return ShiftLetter(letter, shift)
+}
+
+KeyedAtbashLetter(letter) {
+    global keyText
+    alpha := KeywordAlphabet(keyText)
+    u := StrUpper(letter)
+    pos := InStr(alpha, u)
+    if pos <= 0
+        return letter
+    mapped := SubStr(alpha, 27 - pos, 1)
+    return IsUpperLetter(letter) ? mapped : StrLower(mapped)
+}
+
+
+DianaLetter(letter) {
+    global keyText, streamIndex
+    ; Diana-style reciprocal alphabet with key subtraction: C = 25 - (P + K) mod 26.
+    k := KeyShiftAt(keyText, streamIndex)
+    streamIndex += 1
+    p := LetterIndex(StrUpper(letter))
+    c := PositiveMod(25 - p - k, 26)
+    return LetterFromIndex(c, IsUpperLetter(letter))
+}
+
+FibonacciCaesarShiftLetter(letter) {
+    global streamIndex
+    fib := [1,1,2,3,5,8,13,21,34,55,89,144,233,377,610,987,1597,2584,4181,6765,10946,17711,28657,46368,75025,121393]
+    shift := fib[PositiveMod(streamIndex, fib.Length) + 1]
+    streamIndex += 1
+    return ShiftLetter(letter, shift)
+}
+
+PrimeCaesarShiftLetter(letter) {
+    global streamIndex
+    primes := [2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101]
+    shift := primes[PositiveMod(streamIndex, primes.Length) + 1]
+    streamIndex += 1
+    return ShiftLetter(letter, shift)
+}
+
+HomophonicNumberLetter(letter) {
+    idx := LetterIndex(StrUpper(letter)) + 1
+    ; Three possible homophones per letter, randomized every letter.
+    base := idx * 3 - 2
+    return Format("{:02d}", base + Random(0, 2)) . " "
+}
+
+Base32PerLetter(letter) {
+    b := Ord(letter)
+    alpha := "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+    i1 := (b >> 3) + 1
+    i2 := ((b & 7) << 2) + 1
+    return SubStr(alpha, i1, 1) . SubStr(alpha, i2, 1) . "====== "
+}
+
+QuotedPrintableLetter(letter) {
+    ; Force encoded form so the transformation is visible for normal A-Z letters.
+    return "=" . Format("{:02X}", Ord(letter)) . " "
+}
+
+DecimalA0Z25Letter(letter) {
+    return LetterIndex(StrUpper(letter)) . " "
+}
+
+ZeroPaddedA1Z26Letter(letter) {
+    return Format("{:02d}", LetterIndex(StrUpper(letter)) + 1) . " "
+}
+
+OctalA1Z26Letter(letter) {
+    return Format("{:02o}", LetterIndex(StrUpper(letter)) + 1) . " "
+}
+
+Binary6IndexLetter(letter) {
+    return ToBinaryWidth(LetterIndex(StrUpper(letter)) + 1, 6) . " "
+}
+
+Coordinate0BasedLetter(letter) {
+    idx := LetterIndex(StrUpper(letter))
+    row := Floor(idx / 6)
+    col := Mod(idx, 6)
+    return row . "," . col . " "
+}
+
+MorseCompact01Letter(letter) {
+    morse := Trim(MorseLetter(letter))
+    if morse = ""
+        return letter
+    out := ""
+    for _, ch in StrSplit(morse) {
+        if ch = "."
+            out .= "0"
+        else if ch = "-"
+            out .= "1"
+    }
+    return out . " "
+}
+
+PolybiusReversedLetter(letter) {
+    u := StrUpper(letter)
+    if u = "J"
+        u := "I"
+    square := "ZYXWVUTSRQPONMLKIHGFEDCBA"
+    square := StrReplace(square, "J", "")
+    idx := InStr(square, u) - 1
+    if idx < 0
+        return letter
+    row := Floor(idx / 5) + 1
+    col := Mod(idx, 5) + 1
+    return row . col . " "
+}
+
+MaritimeFlagLetter(letter) {
+    ; Unicode regional indicators render as signal-flag-like letters in many fonts.
+    return Chr(0x1F1E6 + LetterIndex(StrUpper(letter))) . " "
+}
+
+RegionalIndicatorLetter(letter) {
+    return Chr(0x1F1E6 + LetterIndex(StrUpper(letter))) . " "
+}
+
+CircledLetter(letter) {
+    idx := LetterIndex(StrUpper(letter))
+    ch := Chr(0x24B6 + idx)
+    return ch . " "
+}
+
+SquaredUnicodeLetter(letter) {
+    idx := LetterIndex(StrUpper(letter))
+    if idx < 26
+        return Chr(0x1F130 + idx) . " "
+    return letter
+}
+
+ParenthesizedLetter(letter) {
+    idx := LetterIndex(StrUpper(letter))
+    if idx = 0
+        return "⒜ "
+    if idx >= 1 && idx <= 25
+        return Chr(0x249C + idx) . " "
+    return letter
+}
+
+FrakturLetter(letter) {
+    chars := ["𝔄","𝔅","ℭ","𝔇","𝔈","𝔉","𝔊","ℌ","ℑ","𝔍","𝔎","𝔏","𝔐","𝔑","𝔒","𝔓","𝔔","ℜ","𝔖","𝔗","𝔘","𝔙","𝔚","𝔛","𝔜","ℨ"]
+    return chars[LetterIndex(StrUpper(letter)) + 1]
+}
+
+ScriptLetter(letter) {
+    chars := ["𝒜","ℬ","𝒞","𝒟","ℰ","ℱ","𝒢","ℋ","ℐ","𝒥","𝒦","ℒ","ℳ","𝒩","𝒪","𝒫","𝒬","ℛ","𝒮","𝒯","𝒰","𝒱","𝒲","𝒳","𝒴","𝒵"]
+    return chars[LetterIndex(StrUpper(letter)) + 1]
+}
+
+SmallCapsLetter(letter) {
+    m := Map("A","ᴀ", "B","ʙ", "C","ᴄ", "D","ᴅ", "E","ᴇ", "F","ꜰ", "G","ɢ", "H","ʜ", "I","ɪ", "J","ᴊ", "K","ᴋ", "L","ʟ", "M","ᴍ", "N","ɴ", "O","ᴏ", "P","ᴘ", "Q","ǫ", "R","ʀ", "S","ꜱ", "T","ᴛ", "U","ᴜ", "V","ᴠ", "W","ᴡ", "X","x", "Y","ʏ", "Z","ᴢ")
+    u := StrUpper(letter)
+    return m.Has(u) ? m[u] : letter
+}
+
+SuperscriptLetter(letter) {
+    m := Map("A","ᴬ", "B","ᴮ", "C","ᶜ", "D","ᴰ", "E","ᴱ", "F","ᶠ", "G","ᴳ", "H","ᴴ", "I","ᴵ", "J","ᴶ", "K","ᴷ", "L","ᴸ", "M","ᴹ", "N","ᴺ", "O","ᴼ", "P","ᴾ", "Q","Q", "R","ᴿ", "S","ˢ", "T","ᵀ", "U","ᵁ", "V","ⱽ", "W","ᵂ", "X","ˣ", "Y","ʸ", "Z","ᶻ")
+    u := StrUpper(letter)
+    return m.Has(u) ? m[u] : letter
+}
+
+SubscriptLetter(letter) {
+    m := Map("A","ₐ", "B","ᵦ", "C","꜀", "D","ᑯ", "E","ₑ", "F","բ", "G","₉", "H","ₕ", "I","ᵢ", "J","ⱼ", "K","ₖ", "L","ₗ", "M","ₘ", "N","ₙ", "O","ₒ", "P","ₚ", "Q","q", "R","ᵣ", "S","ₛ", "T","ₜ", "U","ᵤ", "V","ᵥ", "W","w", "X","ₓ", "Y","ᵧ", "Z","₂")
+    u := StrUpper(letter)
+    return m.Has(u) ? m[u] : letter
+}
+
+ZalgoLightLetter(letter) {
+    marks := [Chr(0x0301), Chr(0x0302), Chr(0x0303), Chr(0x0304), Chr(0x0307), Chr(0x0308), Chr(0x0332)]
+    return letter . marks[Random(1, marks.Length)]
+}
+
+MirrorTextAlphabetLetter(letter) {
+    m := Map("A","A", "B","ᗺ", "C","Ɔ", "D","ᗡ", "E","Ǝ", "F","ꟻ", "G","Ꭾ", "H","H", "I","I", "J","Ⴑ", "K","ꓘ", "L","⅃", "M","M", "N","И", "O","O", "P","ꟼ", "Q","Ϙ", "R","Я", "S","S", "T","T", "U","U", "V","V", "W","W", "X","X", "Y","Y", "Z","Z")
+    u := StrUpper(letter)
+    out := m.Has(u) ? m[u] : letter
+    return out
+}
+
 ToBinaryWidth(value, width) {
     out := ""
     mask := 1 << (width - 1)
@@ -2389,6 +3366,1069 @@ RepeatText(text, count) {
     Loop count
         out .= text
     return out
+}
+
+
+; ------------------------------------------------------------
+; More ciphers v5
+; ------------------------------------------------------------
+
+KeyedPolybiusLetter(letter) {
+    global keyText
+    u := StrUpper(letter)
+    if u = "J"
+        u := "I"
+    square := PlayfairSquare(keyText)
+    idx := InStr(square, u) - 1
+    if idx < 0
+        return letter
+    return (Floor(idx / 5) + 1) . (Mod(idx, 5) + 1) . " "
+}
+
+KeyedADFGXLetter(letter) {
+    global keyText
+    u := StrUpper(letter)
+    if u = "J"
+        u := "I"
+    square := PlayfairSquare(keyText)
+    idx := InStr(square, u) - 1
+    if idx < 0
+        return letter
+    labels := "ADFGX"
+    return SubStr(labels, Floor(idx / 5) + 1, 1) . SubStr(labels, Mod(idx, 5) + 1, 1) . " "
+}
+
+KeyedADFGVXLetter(letter) {
+    global keyText
+    u := StrUpper(letter)
+    square := KeyedAlphaNum36(keyText)
+    idx := InStr(square, u) - 1
+    if idx < 0
+        return letter
+    labels := "ADFGVX"
+    return SubStr(labels, Floor(idx / 6) + 1, 1) . SubStr(labels, Mod(idx, 6) + 1, 1) . " "
+}
+
+KeyedAlphaNum36(key) {
+    base := "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    clean := RegExReplace(StrUpper(key), "[^A-Z0-9]", "")
+    out := ""
+    for _, ch in StrSplit(clean) {
+        if InStr(base, ch) && !InStr(out, ch)
+            out .= ch
+    }
+    for _, ch in StrSplit(base) {
+        if !InStr(out, ch)
+            out .= ch
+    }
+    return SubStr(out, 1, 36)
+}
+
+MorbitMorseLetter(letter) {
+    global keyText
+    seq := StrReplace(Trim(MorseLetter(letter)), " ", "") . "x"
+    if Mod(StrLen(seq), 2) = 1
+        seq .= "x"
+    triples := ["..", ".-", ".x", "-.", "--", "-x", "x.", "x-", "xx"]
+    digits := MorbitDigitOrder(keyText)
+    out := ""
+    Loop StrLen(seq) // 2 {
+        pair := SubStr(seq, (A_Index - 1) * 2 + 1, 2)
+        idx := IndexOf(triples, pair)
+        out .= SubStr(digits, idx, 1)
+    }
+    return out . " "
+}
+
+MorbitDigitOrder(key) {
+    clean := CleanDigits(key)
+    out := ""
+    for _, ch in StrSplit(clean) {
+        if ch != "0" && !InStr(out, ch)
+            out .= ch
+    }
+    Loop 9 {
+        d := A_Index . ""
+        if !InStr(out, d)
+            out .= d
+    }
+    return SubStr(out, 1, 9)
+}
+
+FractionatedMorseLetter(letter) {
+    global keyText
+    seq := StrReplace(Trim(MorseLetter(letter)), " ", "") . "x"
+    while Mod(StrLen(seq), 3) != 0
+        seq .= "x"
+    codes := ["...", "..-", "..x", ".-.", ".--", ".-x", ".x.", ".x-", ".xx", "-..", "-.-", "-.x", "--.", "---", "--x", "-x.", "-x-", "-xx", "x..", "x.-", "x.x", "x-.", "x--", "x-x", "xx.", "xx-"]
+    alpha := KeywordAlphabet(keyText)
+    out := ""
+    Loop StrLen(seq) // 3 {
+        tri := SubStr(seq, (A_Index - 1) * 3 + 1, 3)
+        idx := IndexOf(codes, tri)
+        if idx >= 1 && idx <= 26
+            out .= SubStr(alpha, idx, 1)
+    }
+    return out . " "
+}
+
+MorseReverseLetter(letter) {
+    m := Trim(MorseLetter(letter))
+    out := ""
+    for _, ch in StrSplit(m) {
+        if ch = "."
+            out .= "-"
+        else if ch = "-"
+            out .= "."
+    }
+    return out . " "
+}
+
+MorseEmojiLetter(letter) {
+    m := Trim(MorseLetter(letter))
+    out := ""
+    for _, ch in StrSplit(m) {
+        if ch = "."
+            out .= "·"
+        else if ch = "-"
+            out .= "━"
+    }
+    return out . " "
+}
+
+MorseTapDigitsLetter(letter) {
+    m := Trim(MorseLetter(letter))
+    out := ""
+    for _, ch in StrSplit(m) {
+        if ch = "."
+            out .= "1"
+        else if ch = "-"
+            out .= "2"
+    }
+    return out . " "
+}
+
+Baconian24Letter(letter) {
+    u := StrUpper(letter)
+    if u = "J"
+        u := "I"
+    if u = "V"
+        u := "U"
+    alpha := "ABCDEFGHIKLMNOPQRSTUWXYZ"
+    idx := InStr(alpha, u) - 1
+    if idx < 0
+        return letter
+    out := ""
+    mask := 16
+    while mask >= 1 {
+        out .= (idx & mask) ? "B" : "A"
+        mask := Floor(mask / 2)
+    }
+    return out . " "
+}
+
+KamasutraLetter(letter) {
+    global keyText
+    alpha := KeywordAlphabet(keyText)
+    trans := Map()
+    Loop 13 {
+        a := SubStr(alpha, A_Index, 1)
+        b := SubStr(alpha, A_Index + 13, 1)
+        trans[a] := b
+        trans[b] := a
+    }
+    u := StrUpper(letter)
+    out := trans.Has(u) ? trans[u] : u
+    return IsUpperLetter(letter) ? out : StrLower(out)
+}
+
+PhillipsLetter(letter) {
+    global keyText, streamIndex
+    u := StrUpper(letter)
+    if u = "J"
+        u := "I"
+    square := PhillipsSquareForGroup(keyText, Floor(streamIndex / 5))
+    streamIndex += 1
+    idx := InStr(square, u) - 1
+    if idx < 0
+        return letter
+    r := Floor(idx / 5), c := Mod(idx, 5)
+    mapped := SubStr(square, Mod(r + 1, 5) * 5 + c + 1, 1)
+    return IsUpperLetter(letter) ? mapped : StrLower(mapped)
+}
+
+PhillipsSquareForGroup(key, group) {
+    square := PlayfairSquare(key)
+    shift := Mod(group, 5)
+    rows := []
+    Loop 5
+        rows.Push(SubStr(square, (A_Index - 1) * 5 + 1, 5))
+    out := ""
+    Loop 5 {
+        idx := Mod(A_Index - 1 + shift, 5) + 1
+        out .= rows[idx]
+    }
+    return out
+}
+
+SlidefairLetter(letter) {
+    global pairBuffer
+    u := StrUpper(letter)
+    if pairBuffer = "" {
+        pairBuffer := u
+        return ""
+    }
+    a := pairBuffer
+    b := u
+    pairBuffer := ""
+    return SlidefairEncryptPair(a, b, IsUpperLetter(letter))
+}
+
+SlidefairEncryptPair(a, b, uppercase := true) {
+    global keyText, streamIndex
+    k := KeyShiftAt(keyText, streamIndex)
+    streamIndex += 1
+    ai := LetterIndex(a)
+    bi := LetterIndex(b)
+    c1 := LetterFromIndex(ai + k, true)
+    c2 := LetterFromIndex(bi + ai + k, true)
+    out := c1 . c2
+    return uppercase ? out : StrLower(out)
+}
+
+ColemakLetter(letter) {
+    colemak := "QWFPGJLUYARSTDHNEIOZXCVBKM"
+    idx := LetterIndex(StrUpper(letter))
+    out := SubStr(colemak, idx + 1, 1)
+    return IsUpperLetter(letter) ? out : StrLower(out)
+}
+
+QwertzLetter(letter) {
+    m := Map("Y","Z", "Z","Y")
+    u := StrUpper(letter)
+    out := m.Has(u) ? m[u] : u
+    return IsUpperLetter(letter) ? out : StrLower(out)
+}
+
+KeyboardAdjacentRightLetter(letter) {
+    rows := ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"]
+    return KeyboardAdjacent(letter, rows, 1)
+}
+
+KeyboardAdjacentLeftLetter(letter) {
+    rows := ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"]
+    return KeyboardAdjacent(letter, rows, -1)
+}
+
+KeyboardAdjacent(letter, rows, delta) {
+    u := StrUpper(letter)
+    for _, row in rows {
+        pos := InStr(row, u)
+        if pos > 0 {
+            newPos := PositiveMod(pos - 1 + delta, StrLen(row)) + 1
+            out := SubStr(row, newPos, 1)
+            return IsUpperLetter(letter) ? out : StrLower(out)
+        }
+    }
+    return letter
+}
+
+PhoneT9DigitLetter(letter) {
+    u := StrUpper(letter)
+    if InStr("ABC", u)
+        return "2 "
+    if InStr("DEF", u)
+        return "3 "
+    if InStr("GHI", u)
+        return "4 "
+    if InStr("JKL", u)
+        return "5 "
+    if InStr("MNO", u)
+        return "6 "
+    if InStr("PQRS", u)
+        return "7 "
+    if InStr("TUV", u)
+        return "8 "
+    if InStr("WXYZ", u)
+        return "9 "
+    return letter
+}
+
+PhoneMultitapLetter(letter) {
+    groups := Map("2", "ABC", "3", "DEF", "4", "GHI", "5", "JKL", "6", "MNO", "7", "PQRS", "8", "TUV", "9", "WXYZ")
+    u := StrUpper(letter)
+    for digit, group in groups {
+        pos := InStr(group, u)
+        if pos > 0
+            return RepeatText(digit, pos) . " "
+    }
+    return letter
+}
+
+ChessCoordinateLetter(letter) {
+    idx := LetterIndex(StrUpper(letter))
+    files := "ABCDEFGH"
+    file := SubStr(files, Mod(idx, 8) + 1, 1)
+    rank := Floor(idx / 8) + 1
+    return file . rank . " "
+}
+
+DicePairCodeLetter(letter) {
+    idx := LetterIndex(StrUpper(letter))
+    return (Floor(idx / 6) + 1) . "-" . (Mod(idx, 6) + 1) . " "
+}
+
+DominoTileCodeLetter(letter) {
+    idx := LetterIndex(StrUpper(letter))
+    left := Floor(idx / 7)
+    right := Mod(idx, 7)
+    code := 0x1F030 + left * 8 + right
+    return Chr(code) . " "
+}
+
+PlayingCardCodeLetter(letter) {
+    idx := LetterIndex(StrUpper(letter))
+    suits := [0x1F0A0, 0x1F0B0, 0x1F0C0, 0x1F0D0]
+    suit := Floor(idx / 13) + 1
+    rank := Mod(idx, 13) + 1
+    if rank >= 12
+        rank += 1 ; skip knight slot in Unicode card block
+    return Chr(suits[suit] + rank) . " "
+}
+
+Base58IndexLetter(letter) {
+    alpha := "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+    return SubStr(alpha, LetterIndex(StrUpper(letter)) + 1, 1) . " "
+}
+
+Base62IndexLetter(letter) {
+    alpha := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+    return SubStr(alpha, LetterIndex(StrUpper(letter)) + 11, 1) . " "
+}
+
+CrockfordBase32IndexLetter(letter) {
+    alpha := "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+    return SubStr(alpha, LetterIndex(StrUpper(letter)) + 1, 1) . " "
+}
+
+Base85PerLetter(letter) {
+    v := Ord(letter)
+    high := Floor(v / 85)
+    low := Mod(v, 85)
+    return Chr(33 + high) . Chr(33 + low) . " "
+}
+
+UuencodePerLetter(letter) {
+    v := Ord(letter) & 0x3F
+    return Chr(v = 0 ? 96 : v + 32) . " "
+}
+
+EBCDICHexLetter(letter) {
+    u := StrUpper(letter)
+    idx := LetterIndex(u)
+    if idx < 9
+        code := 0xC1 + idx
+    else if idx < 18
+        code := 0xD1 + (idx - 9)
+    else
+        code := 0xE2 + (idx - 18)
+    if !IsUpperLetter(letter)
+        code += 0x40
+    return Format("{:02X} ", code)
+}
+
+Utf8HexLetter(letter) {
+    return Format("{:02X} ", Ord(letter))
+}
+
+Utf16LEHexLetter(letter) {
+    code := Ord(letter)
+    return Format("{:02X} {:02X} ", code & 0xFF, (code >> 8) & 0xFF)
+}
+
+HtmlHexEntityLetter(letter) {
+    return "&#x" . Format("{:X}", Ord(letter)) . "; "
+}
+
+LCGChecksumTokenLetter(letter) {
+    ; Lightweight deterministic pseudo-hash token for live typing display.
+    code := Ord(letter)
+    v := PositiveMod(code * 1103515245 + 12345, 0x1000000)
+    return Format("{:06X} ", v)
+}
+
+KnuthChecksumTokenLetter(letter) {
+    ; Lightweight deterministic pseudo-hash token for live typing display.
+    code := Ord(letter)
+    v := PositiveMod((code * 2654435761) ^ 0x5A5A5A, 0x1000000)
+    return Format("{:06X} ", v)
+}
+
+RandomDigitPermutation(length := 9) {
+    arr := []
+    Loop length
+        arr.Push(A_Index . "")
+    i := arr.Length
+    while i > 1 {
+        j := Random(1, i)
+        tmp := arr[i]
+        arr[i] := arr[j]
+        arr[j] := tmp
+        i -= 1
+    }
+    out := ""
+    for _, ch in arr
+        out .= ch
+    return out
+}
+
+
+; ------------------------------------------------------------
+; Real-world and historical live/block ciphers added in v7
+; ------------------------------------------------------------
+
+RailFenceBlockLetter(letter) {
+    return BlockCipherLetter(letter, 10, "Rail")
+}
+
+ScytaleBlockLetter(letter) {
+    return BlockCipherLetter(letter, 8, "Scytale")
+}
+
+ColumnarBlockLetter(letter) {
+    return BlockCipherLetter(letter, 10, "Columnar")
+}
+
+DoubleColumnarBlockLetter(letter) {
+    return BlockCipherLetter(letter, 12, "DoubleColumnar")
+}
+
+RouteCipherBlockLetter(letter) {
+    return BlockCipherLetter(letter, RouteBlockSize(), "Route")
+}
+
+MyszkowskiBlockLetter(letter) {
+    return BlockCipherLetter(letter, 12, "Myszkowski")
+}
+
+BifidFullPeriodLetter(letter) {
+    return BlockCipherLetter(letter, 10, "BifidFull")
+}
+
+TrifidFullPeriodLetter(letter) {
+    return BlockCipherLetter(letter, 9, "TrifidFull")
+}
+
+BlockCipherLetter(letter, blockSize, kind) {
+    global pairBuffer
+    pairBuffer .= StrUpper(letter)
+    if StrLen(pairBuffer) < blockSize
+        return ""
+    block := pairBuffer
+    pairBuffer := ""
+    return EncryptNamedBlock(block, kind) . " "
+}
+
+EncryptNamedBlock(block, kind) {
+    global keyText, shiftValue
+    switch kind {
+        case "Rail":
+            return RailFenceBlockTransform(block, Max(2, Min(8, shiftValue)))
+        case "Scytale":
+            return ScytaleTransform(block, Max(2, Min(10, shiftValue)))
+        case "Columnar":
+            return ColumnarTransform(block, keyText)
+        case "DoubleColumnar":
+            return ColumnarTransform(ColumnarTransform(block, keyText), ReverseString(CleanLetters(keyText) = "" ? "KEY" : CleanLetters(keyText)))
+        case "Route":
+            return RouteSpiralTransform(block, RouteBlockSide())
+        case "Myszkowski":
+            return MyszkowskiTransform(block, keyText)
+        case "BifidFull":
+            return BifidFullTransform(block, keyText)
+        case "TrifidFull":
+            return TrifidFullTransform(block, keyText)
+    }
+    return block
+}
+
+RouteBlockSide() {
+    global shiftValue
+    return shiftValue >= 4 ? 4 : 3
+}
+
+RouteBlockSize() {
+    side := RouteBlockSide()
+    return side * side
+}
+
+PadRight(text, length, pad := "X") {
+    while StrLen(text) < length
+        text .= pad
+    return SubStr(text, 1, length)
+}
+
+
+RailFenceBlockTransform(block, rails := 3) {
+    rails := Max(2, Min(8, rails))
+    rows := []
+    Loop rails
+        rows.Push("")
+    r := 1
+    dir := 1
+    for _, ch in StrSplit(block) {
+        rows[r] .= ch
+        if r = rails
+            dir := -1
+        else if r = 1
+            dir := 1
+        r += dir
+    }
+    out := ""
+    for _, row in rows
+        out .= row
+    return out
+}
+
+ScytaleTransform(block, cols := 4) {
+    cols := Max(2, Min(10, cols))
+    rows := Ceil(StrLen(block) / cols)
+    block := PadRight(block, rows * cols, "X")
+    out := ""
+    Loop cols {
+        c := A_Index
+        Loop rows {
+            pos := (A_Index - 1) * cols + c
+            out .= SubStr(block, pos, 1)
+        }
+    }
+    return out
+}
+
+ColumnOrder(key) {
+    clean := CleanLetters(key)
+    if clean = ""
+        clean := "KEY"
+    order := []
+    Loop StrLen(clean)
+        order.Push(A_Index)
+    i := 1
+    while i <= order.Length {
+        j := i + 1
+        while j <= order.Length {
+            a := SubStr(clean, order[i], 1)
+            b := SubStr(clean, order[j], 1)
+            if (b < a) || (b = a && order[j] < order[i]) {
+                tmp := order[i]
+                order[i] := order[j]
+                order[j] := tmp
+            }
+            j += 1
+        }
+        i += 1
+    }
+    return order
+}
+
+ColumnarTransform(block, key) {
+    clean := CleanLetters(key)
+    if clean = ""
+        clean := "KEY"
+    cols := StrLen(clean)
+    rows := Ceil(StrLen(block) / cols)
+    block := PadRight(block, rows * cols, "X")
+    order := ColumnOrder(clean)
+    out := ""
+    for _, c in order {
+        Loop rows {
+            pos := (A_Index - 1) * cols + c
+            out .= SubStr(block, pos, 1)
+        }
+    }
+    return out
+}
+
+MyszkowskiTransform(block, key) {
+    clean := CleanLetters(key)
+    if clean = ""
+        clean := "BALLOON"
+    cols := StrLen(clean)
+    rows := Ceil(StrLen(block) / cols)
+    block := PadRight(block, rows * cols, "X")
+    letters := []
+    for _, ch in StrSplit(clean) {
+        if !ArrayHasValue(letters, ch)
+            letters.Push(ch)
+    }
+    ; Sort unique key letters.
+    i := 1
+    while i <= letters.Length {
+        j := i + 1
+        while j <= letters.Length {
+            if letters[j] < letters[i] {
+                tmp := letters[i]
+                letters[i] := letters[j]
+                letters[j] := tmp
+            }
+            j += 1
+        }
+        i += 1
+    }
+    out := ""
+    for _, keyCh in letters {
+        colsForCh := []
+        Loop cols {
+            if SubStr(clean, A_Index, 1) = keyCh
+                colsForCh.Push(A_Index)
+        }
+        if colsForCh.Length = 1 {
+            c := colsForCh[1]
+            Loop rows {
+                pos := (A_Index - 1) * cols + c
+                out .= SubStr(block, pos, 1)
+            }
+        } else {
+            Loop rows {
+                r := A_Index
+                for _, c in colsForCh {
+                    pos := (r - 1) * cols + c
+                    out .= SubStr(block, pos, 1)
+                }
+            }
+        }
+    }
+    return out
+}
+
+RouteSpiralTransform(block, side := 3) {
+    side := Max(2, Min(5, side))
+    block := PadRight(block, side * side, "X")
+    left := 1
+    right := side
+    top := 1
+    bottom := side
+    out := ""
+    while left <= right && top <= bottom {
+        c := left
+        while c <= right {
+            out .= GridChar(block, side, top, c)
+            c += 1
+        }
+        top += 1
+        r := top
+        while r <= bottom {
+            out .= GridChar(block, side, r, right)
+            r += 1
+        }
+        right -= 1
+        if top <= bottom {
+            c := right
+            while c >= left {
+                out .= GridChar(block, side, bottom, c)
+                c -= 1
+            }
+            bottom -= 1
+        }
+        if left <= right {
+            r := bottom
+            while r >= top {
+                out .= GridChar(block, side, r, left)
+                r -= 1
+            }
+            left += 1
+        }
+    }
+    return out
+}
+
+GridChar(block, side, row, col) {
+    return SubStr(block, (row - 1) * side + col, 1)
+}
+
+ArrayHasValue(arr, value) {
+    for _, v in arr {
+        if v = value
+            return true
+    }
+    return false
+}
+
+BifidFullTransform(block, key) {
+    square := PlayfairSquare(key)
+    coords := ""
+    for _, rawCh in StrSplit(block) {
+        ch := rawCh = "J" ? "I" : rawCh
+        idx := InStr(square, ch) - 1
+        coords .= (Floor(idx / 5) + 1) . (Mod(idx, 5) + 1)
+    }
+    out := ""
+    i := 1
+    while i < StrLen(coords) {
+        r := SubStr(coords, i, 1) + 0
+        c := SubStr(coords, i + 1, 1) + 0
+        out .= SubStr(square, (r - 1) * 5 + c, 1)
+        i += 2
+    }
+    return out
+}
+
+TrifidFullTransform(block, key) {
+    alpha := KeywordAlphabet(key . "ABCDEFGHIJKLMNOPQRSTUVWXYZ") . "."
+    alpha := SubStr(alpha, 1, 27)
+    coords := ""
+    for _, rawCh in StrSplit(block) {
+        ch := rawCh = "J" ? "I" : rawCh
+        idx := InStr(alpha, ch) - 1
+        if idx < 0
+            idx := 26
+        layer := Floor(idx / 9) + 1
+        rem := Mod(idx, 9)
+        row := Floor(rem / 3) + 1
+        col := Mod(rem, 3) + 1
+        coords .= layer . row . col
+    }
+    out := ""
+    i := 1
+    while i + 2 <= StrLen(coords) {
+        layer := SubStr(coords, i, 1) + 0
+        row := SubStr(coords, i + 1, 1) + 0
+        col := SubStr(coords, i + 2, 1) + 0
+        idx := (layer - 1) * 9 + (row - 1) * 3 + col
+        out .= SubStr(alpha, idx, 1)
+        i += 3
+    }
+    return out
+}
+
+JeffersonDiskLetter(letter) {
+    global streamIndex, keyText
+    disks := CylinderDisks("Jefferson")
+    disk := disks[PositiveMod(streamIndex, disks.Length) + 1]
+    idx := InStr(disk, StrUpper(letter)) - 1
+    shift := KeyShiftAt(keyText, streamIndex) + 1
+    streamIndex += 1
+    mapped := SubStr(disk, PositiveMod(idx + shift, 26) + 1, 1)
+    return IsUpperLetter(letter) ? mapped : StrLower(mapped)
+}
+
+M94CylinderLetter(letter) {
+    global streamIndex, keyText
+    disks := CylinderDisks("M94")
+    disk := disks[PositiveMod(streamIndex, disks.Length) + 1]
+    idx := InStr(disk, StrUpper(letter)) - 1
+    shift := KeyShiftAt(keyText, streamIndex) + 2
+    streamIndex += 1
+    mapped := SubStr(disk, PositiveMod(idx + shift, 26) + 1, 1)
+    return IsUpperLetter(letter) ? mapped : StrLower(mapped)
+}
+
+BazeriesCylinderLetter(letter) {
+    global streamIndex, keyText
+    disks := CylinderDisks("Bazeries")
+    disk := disks[PositiveMod(streamIndex, disks.Length) + 1]
+    idx := InStr(disk, StrUpper(letter)) - 1
+    shift := 26 - (KeyShiftAt(keyText, streamIndex) + 1)
+    streamIndex += 1
+    mapped := SubStr(disk, PositiveMod(idx + shift, 26) + 1, 1)
+    return IsUpperLetter(letter) ? mapped : StrLower(mapped)
+}
+
+CylinderDisks(kind) {
+    if kind = "M94" {
+        words := ["ARMY", "SIGNAL", "CORPS", "RADIO", "FIELD", "CAMP", "FORT", "EAGLE", "LIBERTY", "CIPHER", "WIRE", "MARCH", "HORSE", "RIVER", "BRIDGE", "CANNON", "PATROL", "SCOUT", "GUARD", "ORDER", "BUGLE", "NATION", "VICTORY", "BATTLE", "COMMAND"]
+    } else if kind = "Bazeries" {
+        words := ["BAZERIES", "FRANCE", "PARIS", "MARINE", "ARMEE", "SECRET", "DIPLOMAT", "COURIER", "NAPOLEON", "CITADEL", "REPUBLIC", "MINISTER", "GENERAL", "BUREAU", "CAVALRY", "ARTILLERY", "FORTRESS", "TELEGRAPH", "CODEBOOK", "MESSAGE"]
+    } else {
+        words := ["JEFFERSON", "MONTICELLO", "VIRGINIA", "PRESIDENT", "LIBERTY", "REPUBLIC", "CIPHER", "WHEEL", "DIPLOMACY", "CONGRESS", "SECRET", "LETTER", "FEDERAL", "TREATY", "COLONY", "ATLANTIC", "CABINET", "EMBASSY", "COURIER", "ARCHIVE", "PHILADELPHIA", "DECLARATION", "REVOLUTION", "CAPITOL", "UNION", "AMERICA"]
+    }
+    disks := []
+    for _, word in words
+        disks.Push(KeywordAlphabet(word))
+    return disks
+}
+
+M209HagelinLetter(letter) {
+    global streamIndex, shiftValue
+    ; Hagelin M-209 inspired live stream: six irregular wheels produce a shifting value.
+    wheelLens := [26, 25, 23, 21, 19, 17]
+    pins := ["ABDHIKMNSTVW", "ADEGJKLORSUX", "ABGHJLMNQRS", "CEFHIMNPSTU", "BDEGILMRT", "ACFGHJPQ"]
+    count := 0
+    for i, wheelLen in wheelLens {
+        pos := PositiveMod(streamIndex + shiftValue + i, wheelLen)
+        letterAt := SubStr("ABCDEFGHIJKLMNOPQRSTUVWXYZ", PositiveMod(pos, 26) + 1, 1)
+        if InStr(pins[i], letterAt)
+            count += i
+    }
+    streamIndex += 1
+    return ShiftLetter(letter, -count)
+}
+
+VICCheckerboardLetter(letter) {
+    global keyText
+    order := KeywordAlphabet(keyText . "ETAOINSHRDLCUMWFGYPBVKJXQZ")
+    return CheckerboardNumberLetterWithOrder(letter, "28", order)
+}
+
+CheckerboardNumberLetterWithOrder(letter, rowDigits, order) {
+    u := StrUpper(letter)
+    pos := InStr(order, u)
+    if pos <= 0
+        return letter
+    rd1 := SubStr(rowDigits, 1, 1)
+    rd2 := SubStr(rowDigits, 2, 1)
+    topDigits := []
+    Loop 10 {
+        d := A_Index - 1
+        ds := d . ""
+        if ds != rd1 && ds != rd2
+            topDigits.Push(ds)
+    }
+    if pos <= 8
+        return topDigits[pos] . " "
+    pos2 := pos - 9
+    row := Floor(pos2 / 10)
+    col := Mod(pos2, 10)
+    return (row = 0 ? rd1 : rd2) . col . " "
+}
+
+OneTimePadLetter(letter) {
+    global keyText, streamIndex
+    shift := KeyShiftAt(keyText, streamIndex)
+    streamIndex += 1
+    return ShiftLetter(letter, shift)
+}
+
+VernamXor5BitLetter(letter) {
+    global keyText, streamIndex
+    x := LetterIndex(StrUpper(letter))
+    k := KeyShiftAt(keyText, streamIndex)
+    streamIndex += 1
+    y := PositiveMod((x ^ k), 26)
+    return LetterFromIndex(y, IsUpperLetter(letter))
+}
+
+NihilistNumericStreamLetter(letter) {
+    global keyText, streamIndex
+    cleanKey := CleanLetters(keyText)
+    if cleanKey = ""
+        cleanKey := "KEY"
+    square := KeywordAlphabet(cleanKey)
+    p := PolybiusNumberFor(StrUpper(letter), square)
+    kch := SubStr(cleanKey, PositiveMod(streamIndex, StrLen(cleanKey)) + 1, 1)
+    kval := PolybiusNumberFor(kch, square)
+    streamIndex += 1
+    return (p + kval) . " "
+}
+
+PolybiusNumberFor(ch, square) {
+    if ch = "J"
+        ch := "I"
+    square := StrReplace(square, "J", "")
+    square := SubStr(square . "ABCDEFGHIKLMNOPQRSTUVWXYZ", 1, 25)
+    idx := InStr(square, ch) - 1
+    if idx < 0
+        return 0
+    return (Floor(idx / 5) + 1) * 10 + (Mod(idx, 5) + 1)
+}
+
+BookCipherIndexLetter(letter) {
+    global keyText, streamIndex
+    words := ExtractBookWords(keyText)
+    target := StrUpper(letter)
+    start := PositiveMod(streamIndex, words.Length) + 1
+    i := start
+    Loop words.Length {
+        word := words[i]
+        if SubStr(word, 1, 1) = target {
+            streamIndex += 1
+            return i . " "
+        }
+        i += 1
+        if i > words.Length
+            i := 1
+    }
+    streamIndex += 1
+    return "0" . target . " "
+}
+
+ExtractBookWords(text) {
+    defaultBook := "ALPHA BRAVO CHARLIE DELTA ECHO FOXTROT GOLF HOTEL INDIA JULIET KILO LIMA MIKE NOVEMBER OSCAR PAPA QUEBEC ROMEO SIERRA TANGO UNIFORM VICTOR WHISKEY XRAY YANKEE ZULU"
+    s := CleanLettersWithSpaces(text)
+    if Trim(s) = ""
+        s := defaultBook
+    arr := StrSplit(s, " ")
+    out := []
+    for _, w in arr {
+        if w != ""
+            out.Push(w)
+    }
+    if out.Length = 0
+        out := StrSplit(defaultBook, " ")
+    return out
+}
+
+CleanLettersWithSpaces(text) {
+    s := StrUpper(text)
+    s := RegExReplace(s, "[^A-Z]+", " ")
+    return Trim(s)
+}
+
+InitRC4(key) {
+    global rc4S, rc4I, rc4J
+    rc4S := []
+    Loop 256
+        rc4S.Push(A_Index - 1)
+    if key = ""
+        key := "KEY"
+    j := 0
+    Loop 256 {
+        i := A_Index
+        kval := Ord(SubStr(key, PositiveMod(i - 1, StrLen(key)) + 1, 1))
+        j := PositiveMod(j + rc4S[i] + kval, 256)
+        SwapArrayValues(rc4S, i, j + 1)
+    }
+    rc4I := 0
+    rc4J := 0
+}
+
+RC4NextByte() {
+    global rc4S, rc4I, rc4J
+    if rc4S.Length != 256
+        InitRC4("KEY")
+    rc4I := PositiveMod(rc4I + 1, 256)
+    i := rc4I + 1
+    rc4J := PositiveMod(rc4J + rc4S[i], 256)
+    j := rc4J + 1
+    SwapArrayValues(rc4S, i, j)
+    idx := PositiveMod(rc4S[i] + rc4S[j], 256) + 1
+    return rc4S[idx]
+}
+
+RC4HexStreamLetter(letter) {
+    k := RC4NextByte()
+    return Format("{:02X} ", Ord(letter) ^ k)
+}
+
+SwapArrayValues(arr, i, j) {
+    tmp := arr[i]
+    arr[i] := arr[j]
+    arr[j] := tmp
+}
+
+InitSolitaireDeck(key := "") {
+    global solitaireDeck
+    solitaireDeck := []
+    Loop 54
+        solitaireDeck.Push(A_Index)
+    clean := CleanLetters(key)
+    for _, ch in StrSplit(clean) {
+        SolitaireNextKey()
+        SolitaireCountCut(LetterIndex(ch) + 1)
+    }
+}
+
+SolitairePontifexLetter(letter) {
+    k := SolitaireNextKey()
+    return ShiftLetter(letter, k)
+}
+
+SolitaireNextKey() {
+    global solitaireDeck
+    if solitaireDeck.Length != 54
+        InitSolitaireDeck("")
+    Loop {
+        SolitaireMoveCard(53, 1)
+        SolitaireMoveCard(54, 2)
+        SolitaireTripleCut()
+        bottom := solitaireDeck[54]
+        count := bottom >= 53 ? 53 : bottom
+        SolitaireCountCut(count)
+        top := solitaireDeck[1]
+        idx := top >= 53 ? 53 : top
+        outCard := solitaireDeck[idx + 1]
+        if outCard < 53
+            return PositiveMod(outCard - 1, 26) + 1
+    }
+}
+
+SolitaireMoveCard(card, steps) {
+    global solitaireDeck
+    idx := 0
+    for i, v in solitaireDeck {
+        if v = card {
+            idx := i
+            break
+        }
+    }
+    if idx = 0
+        return
+    solitaireDeck.RemoveAt(idx)
+    newIdx := idx + steps
+    while newIdx > solitaireDeck.Length
+        newIdx -= solitaireDeck.Length
+    if newIdx = 0
+        newIdx := solitaireDeck.Length
+    solitaireDeck.InsertAt(newIdx, card)
+}
+
+SolitaireTripleCut() {
+    global solitaireDeck
+    a := 0
+    b := 0
+    for i, v in solitaireDeck {
+        if v >= 53 {
+            if a = 0
+                a := i
+            else {
+                b := i
+                break
+            }
+        }
+    }
+    if a = 0 || b = 0
+        return
+    newDeck := []
+    i := b + 1
+    while i <= solitaireDeck.Length {
+        newDeck.Push(solitaireDeck[i])
+        i += 1
+    }
+    i := a
+    while i <= b {
+        newDeck.Push(solitaireDeck[i])
+        i += 1
+    }
+    i := 1
+    while i < a {
+        newDeck.Push(solitaireDeck[i])
+        i += 1
+    }
+    solitaireDeck := newDeck
+}
+
+SolitaireCountCut(count) {
+    global solitaireDeck
+    if count <= 0 || count >= solitaireDeck.Length
+        return
+    bottom := solitaireDeck[solitaireDeck.Length]
+    topPart := []
+    i := 1
+    while i <= count {
+        topPart.Push(solitaireDeck[i])
+        i += 1
+    }
+    middle := []
+    while i < solitaireDeck.Length {
+        middle.Push(solitaireDeck[i])
+        i += 1
+    }
+    newDeck := []
+    for _, v in middle
+        newDeck.Push(v)
+    for _, v in topPart
+        newDeck.Push(v)
+    newDeck.Push(bottom)
+    solitaireDeck := newDeck
 }
 
 ; ------------------------------------------------------------
