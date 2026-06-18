@@ -1,4 +1,3 @@
-<!-- do you really think i can make a website about this -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -180,7 +179,8 @@
         '#substitution': ['caesar','atbash','affine','keyword','substitution','vigenere','beaufort','porta','quagmire','playfair'],
         '#morse': ['morse','morbit','pollux','fractionated'],
         '#route': ['route','spiral','boustrophedon','reading order','rotating square'],
-        '#encoding': ['base','hex','binary','url','html','ascii','unicode','morse','whitespace','emoji','leet']
+        '#encoding': ['base','hex','binary','url','html','ascii','unicode','morse','whitespace','emoji','leet'],
+        '#enigma': ['enigma']
       };
       const terms = groups[tag] || [tag.slice(1)];
       return terms.some(t => n.includes(t));
@@ -384,6 +384,154 @@ cipherlib = types.ModuleType('cipherlib')
 cipherlib.__dict__['__name__'] = 'cipherlib'
 sys.modules['cipherlib'] = cipherlib
 exec(compile(PY_SOURCE, 'encripter v2.1.py', 'exec'), cipherlib.__dict__)
+
+
+# Browser add-on: real Enigma M3 and M4 machines.
+# Added after loading the source so it works even if the desktop file does not include Enigma.
+_ENIGMA_ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+_ENIGMA_ROTORS = {
+    "I":    ("EKMFLGDQVZNTOWYHXUSPAIBRCJ", "Q"),
+    "II":   ("AJDKSIRUXBLHWTMCQGZNPYFVOE", "E"),
+    "III":  ("BDFHJLCPRTXVZNYEIWGAKMUSQO", "V"),
+    "IV":   ("ESOVPZJAYQUIRHXLNFTGKDCMWB", "J"),
+    "V":    ("VZBRGITYUPSDNHLXAWMJQOFECK", "Z"),
+    "VI":   ("JPGVOUMFYQBENHZRDKASXLICTW", "ZM"),
+    "VII":  ("NZJHGRCXMYSWBOUFAIVLPEKQDT", "ZM"),
+    "VIII": ("FKQHTLXOCBJSPDZRAMEWNIUYGV", "ZM"),
+    "BETA": ("LEYJVCNIXWPBQMDRTAKZGFUHOS", ""),
+    "GAMMA":("FSOKANUERHMBTIYCWLQPZXVGJD", ""),
+}
+_ENIGMA_REFLECTORS = {
+    "A": "EJMZALYXVBWFCRQUONTSPIKHGD",
+    "B": "YRUHQSLDPXNGOKMIEBFZCWVJAT",
+    "C": "FVPJIAOYEDRZXWGCTKUQSBNMHL",
+    "B-THIN": "ENKQAUYWJICOPBLMDXZVFTHRGS",
+    "C-THIN": "RDOBJNTKVEHMLFCWZAXGYIPSUQ",
+}
+
+def _enigma_clean_rotor_name(x):
+    return str(x or '').strip().upper().replace(' ', '').replace('_', '-')
+
+def _enigma_parse_rotors(rotors, expected):
+    parts = [_enigma_clean_rotor_name(x) for x in str(rotors or '').replace(',', ' ').split() if x.strip()]
+    if len(parts) != expected:
+        raise ValueError(f"Expected {expected} rotors, e.g. {'Beta I II III' if expected == 4 else 'I II III'}")
+    for r in parts:
+        if r not in _ENIGMA_ROTORS:
+            raise ValueError(f"Unknown rotor {r}. Use I-VIII plus Beta/Gamma for M4.")
+    return parts
+
+def _enigma_parse_letters(value, length, default):
+    s = ''.join(ch for ch in str(value or default).upper() if ch in _ENIGMA_ALPHA)
+    if len(s) != length:
+        raise ValueError(f"Expected {length} letters")
+    return [_ENIGMA_ALPHA.index(ch) for ch in s]
+
+def _enigma_plugboard_pairs(plugboard):
+    mapping = {ch: ch for ch in _ENIGMA_ALPHA}
+    raw = str(plugboard or '').upper().replace(',', ' ')
+    pairs = [p for p in raw.split() if p]
+    used = set()
+    for pair in pairs:
+        pair = ''.join(ch for ch in pair if ch in _ENIGMA_ALPHA)
+        if not pair:
+            continue
+        if len(pair) != 2 or pair[0] == pair[1]:
+            raise ValueError("Plugboard pairs must look like AV BS CG")
+        a, b = pair
+        if a in used or b in used:
+            raise ValueError("Plugboard letter used twice")
+        used.update([a, b])
+        mapping[a], mapping[b] = b, a
+    return mapping
+
+def _enigma_forward(c, rotor, pos, ring):
+    wiring = _ENIGMA_ROTORS[rotor][0]
+    i = (c + pos - ring) % 26
+    return (_ENIGMA_ALPHA.index(wiring[i]) - pos + ring) % 26
+
+def _enigma_backward(c, rotor, pos, ring):
+    wiring = _ENIGMA_ROTORS[rotor][0]
+    i = (c + pos - ring) % 26
+    return (wiring.index(_ENIGMA_ALPHA[i]) - pos + ring) % 26
+
+def _enigma_run(text, rotors, reflector, rings, positions, plugboard, m4=False):
+    reflector = _enigma_clean_rotor_name(reflector)
+    if reflector not in _ENIGMA_REFLECTORS:
+        raise ValueError("Unknown reflector")
+    expected = 4 if m4 else 3
+    rotors = _enigma_parse_rotors(rotors, expected)
+    rings = _enigma_parse_letters(rings, expected, 'AAAA' if m4 else 'AAA')
+    pos = _enigma_parse_letters(positions, expected, 'AAAA' if m4 else 'AAA')
+    plug = _enigma_plugboard_pairs(plugboard)
+
+    out = []
+    for ch in str(text):
+        cu = ch.upper()
+        if cu not in _ENIGMA_ALPHA:
+            out.append(ch)
+            continue
+
+        # Step the three fast rotors. In M4, rotor 0 is the static Greek rotor.
+        first_moving = 1 if m4 else 0
+        left, mid, right = first_moving, first_moving + 1, first_moving + 2
+        mid_at_notch = _ENIGMA_ALPHA[pos[mid]] in _ENIGMA_ROTORS[rotors[mid]][1]
+        right_at_notch = _ENIGMA_ALPHA[pos[right]] in _ENIGMA_ROTORS[rotors[right]][1]
+        if mid_at_notch:
+            pos[left] = (pos[left] + 1) % 26
+            pos[mid] = (pos[mid] + 1) % 26
+        elif right_at_notch:
+            pos[mid] = (pos[mid] + 1) % 26
+        pos[right] = (pos[right] + 1) % 26
+
+        c = _ENIGMA_ALPHA.index(plug[cu])
+        for i in range(expected - 1, -1, -1):
+            c = _enigma_forward(c, rotors[i], pos[i], rings[i])
+        c = _ENIGMA_ALPHA.index(_ENIGMA_REFLECTORS[reflector][c])
+        for i in range(expected):
+            c = _enigma_backward(c, rotors[i], pos[i], rings[i])
+        mapped = plug[_ENIGMA_ALPHA[c]]
+        out.append(mapped if ch.isupper() else mapped.lower())
+    return ''.join(out)
+
+def EnigmaM3_encode(text, rotors="I II III", reflector="B", rings="AAA", positions="AAA", plugboard=""):
+    return _enigma_run(text, rotors, reflector, rings, positions, plugboard, m4=False)
+
+def EnigmaM3_decode(text, rotors="I II III", reflector="B", rings="AAA", positions="AAA", plugboard=""):
+    return _enigma_run(text, rotors, reflector, rings, positions, plugboard, m4=False)
+
+def EnigmaM4_encode(text, rotors="Beta I II III", reflector="B-Thin", rings="AAAA", positions="AAAA", plugboard=""):
+    return _enigma_run(text, rotors, reflector, rings, positions, plugboard, m4=True)
+
+def EnigmaM4_decode(text, rotors="Beta I II III", reflector="B-Thin", rings="AAAA", positions="AAAA", plugboard=""):
+    return _enigma_run(text, rotors, reflector, rings, positions, plugboard, m4=True)
+
+_orig_get_registry_for_enigma = cipherlib.get_registry
+def get_registry():
+    reg = list(_orig_get_registry_for_enigma())
+    names = {ce.name for ce in reg}
+    if "Enigma M3" not in names:
+        reg.append(cipherlib.CipherEntry("Enigma M3", EnigmaM3_encode, EnigmaM3_decode, [
+            cipherlib.Param("rotors", "Rotors", "I II III", "Left to right. Available: I II III IV V VI VII VIII"),
+            cipherlib.Param("reflector", "Reflector", "B", "A, B, or C"),
+            cipherlib.Param("rings", "Ring settings", "AAA", "Three letters"),
+            cipherlib.Param("positions", "Start positions", "AAA", "Three letters; must match for decrypt"),
+            cipherlib.Param("plugboard", "Plugboard", "", "Pairs like AV BS CG DL FU HZ")
+        ]))
+    if "Enigma M4" not in names:
+        reg.append(cipherlib.CipherEntry("Enigma M4", EnigmaM4_encode, EnigmaM4_decode, [
+            cipherlib.Param("rotors", "Rotors", "Beta I II III", "Left to right. First rotor should be Beta or Gamma"),
+            cipherlib.Param("reflector", "Thin reflector", "B-Thin", "B-Thin or C-Thin"),
+            cipherlib.Param("rings", "Ring settings", "AAAA", "Four letters"),
+            cipherlib.Param("positions", "Start positions", "AAAA", "Four letters; must match for decrypt"),
+            cipherlib.Param("plugboard", "Plugboard", "", "Pairs like AV BS CG DL FU HZ")
+        ]))
+    return reg
+cipherlib.get_registry = get_registry
+cipherlib.EnigmaM3_encode = EnigmaM3_encode
+cipherlib.EnigmaM3_decode = EnigmaM3_decode
+cipherlib.EnigmaM4_encode = EnigmaM4_encode
+cipherlib.EnigmaM4_decode = EnigmaM4_decode
 `);
         const registryJson = await state.pyodide.runPythonAsync(`
 import json
