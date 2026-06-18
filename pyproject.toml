@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "op-message-encryptor"
+version = "0.1.0"
+description = "A message encryptor and decryptor toolkit with many cipher systems."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [
+  { name = "burning-calamity" }
+]
+keywords = ["cipher", "encryption", "decryption", "cryptography", "classical-ciphers"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+  "License :: OSI Approved :: MIT License",
+]
+
+[project.scripts]
+all-the-ciphers = "all_the_ciphers.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["all_the_ciphers*"]
