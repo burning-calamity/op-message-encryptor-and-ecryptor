@@ -686,6 +686,76 @@ def DellaPortaDisk_decode(text: str, keyword: str = "CIPHER", shift: int | str =
             out.append(ch if keep_others else "")
     return "".join(out)
 
+def AlbertiDisk_encode(text: str, outer: str = ALPHA, inner_key: str = "CIPHER", period: int | str = 5, step: int | str = 1, keep_others: bool = True) -> str:
+    outer_alpha = _normalized_alphabet(outer or ALPHA)
+    inner_alpha = rotate_alpha_from_keyword(inner_key)
+    period = max(1, int(period))
+    step = int(step)
+    out = []
+    pos = 0
+    for ch in text:
+        cu = ch.upper()
+        if cu in outer_alpha:
+            shift = (pos // period) * step
+            shifted_inner = inner_alpha[shift % 26:] + inner_alpha[:shift % 26]
+            mapped = shifted_inner[outer_alpha.index(cu)]
+            out.append(mapped if ch.isupper() else mapped.lower())
+            pos += 1
+        else:
+            out.append(ch if keep_others else "")
+    return "".join(out)
+
+def AlbertiDisk_decode(text: str, outer: str = ALPHA, inner_key: str = "CIPHER", period: int | str = 5, step: int | str = 1, keep_others: bool = True) -> str:
+    outer_alpha = _normalized_alphabet(outer or ALPHA)
+    inner_alpha = rotate_alpha_from_keyword(inner_key)
+    period = max(1, int(period))
+    step = int(step)
+    out = []
+    pos = 0
+    for ch in text:
+        cu = ch.upper()
+        shift = (pos // period) * step
+        shifted_inner = inner_alpha[shift % 26:] + inner_alpha[:shift % 26]
+        if cu in shifted_inner:
+            mapped = outer_alpha[shifted_inner.index(cu)]
+            out.append(mapped if ch.isupper() else mapped.lower())
+            pos += 1
+        else:
+            out.append(ch if keep_others else "")
+    return "".join(out)
+
+def WheatstoneCryptograph_encode(text: str, keyword: str = "WHEATSTONE", indicator: str = "A", keep_others: bool = True) -> str:
+    plain = ALPHA
+    cipher = _rotate_alpha_to_indicator(rotate_alpha_from_keyword(keyword), indicator)
+    out = []
+    pos = 0
+    for ch in text:
+        cu = ch.upper()
+        if cu in plain:
+            shifted = cipher[pos % 26:] + cipher[:pos % 26]
+            mapped = shifted[plain.index(cu)]
+            out.append(mapped if ch.isupper() else mapped.lower())
+            pos += 1
+        else:
+            out.append(ch if keep_others else "")
+    return "".join(out)
+
+def WheatstoneCryptograph_decode(text: str, keyword: str = "WHEATSTONE", indicator: str = "A", keep_others: bool = True) -> str:
+    plain = ALPHA
+    cipher = _rotate_alpha_to_indicator(rotate_alpha_from_keyword(keyword), indicator)
+    out = []
+    pos = 0
+    for ch in text:
+        cu = ch.upper()
+        shifted = cipher[pos % 26:] + cipher[:pos % 26]
+        if cu in shifted:
+            mapped = plain[shifted.index(cu)]
+            out.append(mapped if ch.isupper() else mapped.lower())
+            pos += 1
+        else:
+            out.append(ch if keep_others else "")
+    return "".join(out)
+
 def Condi_encode(text: str, keyword: str = "CIPHER", start: int | str = 0, keep_others: bool = True) -> str:
     alpha = rotate_alpha_from_keyword(keyword)
     shift = int(start) % 26
@@ -8835,6 +8905,8 @@ def get_registry() -> List[CipherEntry]:
         CipherEntry("Homophonic Substitution", HomophonicSubstitution_encode, HomophonicSubstitution_decode, []),
         CipherEntry("Headline Puzzle", HeadlinePuzzle_encode, HeadlinePuzzle_decode, [P("filler_word","Filler word","headline")]),
         CipherEntry("Della Porta Disk", DellaPortaDisk_encode, DellaPortaDisk_decode, [P("keyword","Disk keyword","CIPHER"), P("shift","Shift","0")]),
+        CipherEntry("Alberti Disk", AlbertiDisk_encode, AlbertiDisk_decode, [P("outer","Outer alphabet","ABCDEFGHIJKLMNOPQRSTUVWXYZ"), P("inner_key","Inner key","CIPHER"), P("period","Period","5"), P("step","Step","1")]),
+        CipherEntry("Wheatstone Cryptograph", WheatstoneCryptograph_encode, WheatstoneCryptograph_decode, [P("keyword","Keyword","WHEATSTONE"), P("indicator","Indicator","A")]),
         CipherEntry("Condi", Condi_encode, Condi_decode, [P("keyword","Keyword","CIPHER"), P("start","Start","0")]),
         CipherEntry("Ragbaby", Ragbaby_encode, Ragbaby_decode, [P("keyword","Keyword","RAGBABY")]),
         CipherEntry("Straddling Checkerboard", StraddlingCheckerboard_encode, StraddlingCheckerboard_decode, [P("keyword","Keyword","ETAOINSHRDLCUMWFGYPBVKJXQZ"), P("rowdigits","Row digits","3,7")]),

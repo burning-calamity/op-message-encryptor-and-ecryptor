@@ -11,6 +11,7 @@ Classical substitution / hand ciphers
 6. Caesar random alphabet / keyed Caesar [ADDED: Keyed Caesar]
 7. Caesar with mixed alphabet [ADDED: Caesar Custom Alphabet]
 8. Caesar Della Porta disk variant [ADDED: Della Porta Disk]
+8a. Alberti cipher disk [ADDED: Alberti Disk]
 9. Chaocipher [ADDED]
 10. Checkerboard transposition [ADDED]
 11. Chiffre Indechiffrable variants
@@ -64,7 +65,7 @@ Classical substitution / hand ciphers
 59. Vigenere with custom alphabet [ADDED]
 60. Vigenere progressive-key [ADDED]
 61. Vigenere Beaufort tabula recta variants [ADDED: Beaufort Autokey]
-62. Wheatstone cryptograph simulator
+62. Wheatstone cryptograph simulator [ADDED]
 63. Word Caesar / vocabulary shift [ADDED]
 64. Word substitution dictionary cipher [ADDED]
 65. Zygalski-sheet inspired toy cipher
