@@ -4263,7 +4263,8 @@ RemoveHiddenPresetEntries(m) {
     for _, mode in MODE_LIST
         visible[mode] := true
 
-    deleteKeys := []
+
+deleteKeys := []
     for presetMode, _ in m {
         if !visible.Has(presetMode)
             deleteKeys.Push(presetMode)
