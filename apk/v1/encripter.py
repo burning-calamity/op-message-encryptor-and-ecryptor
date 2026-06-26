@@ -9530,13 +9530,15 @@ def cli_main(argv: List[str]) -> int:
     elif args.cmd == "guess":
         ranked = SmartGuess(args.text)
         for i,(label, pt, sc) in enumerate(ranked, 1):
-            print(f"{i:2d}. {label:28} score={sc:8.2f} | {pt[:80].replace('\\n',' ')}")
+            preview = pt[:80].replace("\n", " ")
+            print(f"{i:2d}. {label:28} score={sc:8.2f} | {preview}")
         return 0
     elif args.cmd == "brute":
         fams = args.family or ["caesar","affine","railfence","vigenere-short","xor-hex"]
         ranked = BruteForce(args.text, fams)
         for i,(label, pt, sc) in enumerate(ranked, 1):
-            print(f"{i:2d}. {label:28} score={sc:8.2f} | {pt[:80].replace('\\n',' ')}")
+            preview = pt[:80].replace("\n", " ")
+            print(f"{i:2d}. {label:28} score={sc:8.2f} | {preview}")
         return 0
     else:
         parser.print_help()
