@@ -47,7 +47,7 @@ jobs:
 
     environment:
       name: pypi
-      url: https://pypi.org/project/all-the-ciphers/
+      url: https://pypi.org/project/ars-occultandarum-litterarum/
 
     steps:
       - name: Download built package
@@ -58,3 +58,5 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
