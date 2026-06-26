@@ -42,8 +42,27 @@ try:
     import tkinter as tk
     from tkinter import ttk, messagebox
 except Exception:
-    tk = None
-    ttk = None
+    class _MissingTkWidget:
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError("Tkinter is not available in this Python environment")
+
+    class _MissingTkModule:
+        END = "end"
+        WORD = "word"
+        BOTH = "both"
+        LEFT = "left"
+        RIGHT = "right"
+        X = "x"
+        Y = "y"
+        VERTICAL = "vertical"
+        HORIZONTAL = "horizontal"
+
+        def __getattr__(self, _name):
+            return _MissingTkWidget
+
+    tk = _MissingTkModule()
+    ttk = _MissingTkModule()
+    messagebox = _MissingTkModule()
 
 # =============================================================================
 # Core utilities
@@ -685,6 +704,95 @@ def DellaPortaDisk_decode(text: str, keyword: str = "CIPHER", shift: int | str =
         else:
             out.append(ch if keep_others else "")
     return "".join(out)
+
+def WolseleyDisk_encode(text: str, keyword: str = "WOLSELEY", shift: int | str = 0, keep_others: bool = True) -> str:
+    disk = rotate_alpha_from_keyword(keyword)
+    shift = int(shift)
+    out = []
+    for ch in text:
+        cu = ch.upper()
+        if cu in ALPHA_SET:
+            mapped = disk[(25 - ALPHA.index(cu) + shift) % 26]
+            out.append(mapped if ch.isupper() else mapped.lower())
+        else:
+            out.append(ch if keep_others else "")
+    return "".join(out)
+
+def WolseleyDisk_decode(text: str, keyword: str = "WOLSELEY", shift: int | str = 0, keep_others: bool = True) -> str:
+    disk = rotate_alpha_from_keyword(keyword)
+    shift = int(shift)
+    out = []
+    for ch in text:
+        cu = ch.upper()
+        if cu in disk:
+            mapped = ALPHA[(25 - ((disk.index(cu) - shift) % 26)) % 26]
+            out.append(mapped if ch.isupper() else mapped.lower())
+        else:
+            out.append(ch if keep_others else "")
+    return "".join(out)
+
+_DORABELLA_ALPHA = "ABCDEFGHIKLMNOPQRSTUVWXYZ"
+_DORABELLA_SYMBOLS = [
+    "◜", "◠", "◝", "◞", "◡", "◟", "△", "▷",
+    "▽", "◁", "◇", "○", "□", "●", "■", "▲",
+    "▶", "▼", "◀", "◆", "◎", "◉", "◌", "◍", "◐",
+]
+_DORABELLA_ENC = dict(zip(_DORABELLA_ALPHA, _DORABELLA_SYMBOLS))
+_DORABELLA_DEC = {v: k for k, v in _DORABELLA_ENC.items()}
+
+def Dorabella_encode(text: str, sep: str = " ") -> str:
+    tokens = []
+    for ch in text:
+        cu = ch.upper().replace("J", "I")
+        if cu in _DORABELLA_ENC:
+            tokens.append(_DORABELLA_ENC[cu])
+        elif ch.isspace():
+            tokens.append("/")
+        else:
+            tokens.append(ch)
+    return sep.join(tokens) if sep else "".join(tokens)
+
+def Dorabella_decode(text: str, sep: str = " ") -> str:
+    out = []
+    if sep:
+        tokens = text.split(sep)
+        for tok in tokens:
+            if tok == "/":
+                out.append(" ")
+            else:
+                out.append(_DORABELLA_DEC.get(tok, tok))
+        return "".join(out)
+    for ch in text:
+        if ch == "/":
+            out.append(" ")
+        else:
+            out.append(_DORABELLA_DEC.get(ch, ch))
+    return "".join(out)
+
+def SLIDEX_encode(text: str, key: str = "SLIDEX", row_labels: str = "12345", col_labels: str = "12345", sep: str = " ") -> str:
+    _, pos, _rev = _key_square_5(key)
+    rows = ((row_labels or "") + "12345")[:5]
+    cols = ((col_labels or "") + "12345")[:5]
+    out = []
+    for ch in only_alpha(text).replace("J", "I"):
+        r, c = pos[ch]
+        out.append(rows[r] + cols[c])
+    return sep.join(out) if sep else "".join(out)
+
+def SLIDEX_decode(text: str, key: str = "SLIDEX", row_labels: str = "12345", col_labels: str = "12345", sep: str = " ") -> str:
+    _sq, _pos, rev = _key_square_5(key)
+    rows = ((row_labels or "") + "12345")[:5]
+    cols = ((col_labels or "") + "12345")[:5]
+    tokens = text.split(sep) if sep else re.findall(r"..", re.sub(r"\s+", "", text))
+    out = []
+    for tok in tokens:
+        if len(tok) < 2:
+            continue
+        try:
+            out.append(rev[(rows.index(tok[0]), cols.index(tok[1]))])
+        except ValueError:
+            continue
+    return "".join(out).lower()
 
 def AlbertiDisk_encode(text: str, outer: str = ALPHA, inner_key: str = "CIPHER", period: int | str = 5, step: int | str = 1, keep_others: bool = True) -> str:
     outer_alpha = _normalized_alphabet(outer or ALPHA)
@@ -3964,7 +4072,7 @@ def VanityPhone_encode(text: str, keep_punctuation: bool = True) -> str:
             out.append(ch)
     return "".join(out)
 
-def VanityPhone_decode(text: str) -> str:
+def VanityPhone_decode(text: str, keep_punctuation: bool = True) -> str:
     groups = []
     for ch in text:
         if ch in T9_GROUPS:
@@ -6497,7 +6605,7 @@ def Columnar_decode(text: str, key: str = "CIPHER") -> str:
         columns_sorted += [c for c, o in enumerate(order) if o == ord_val]
     counts = {c: base for c in range(cols)}
     for i in range(extra):
-        counts[columns_sorted[i]] += 1
+        counts[i] += 1
     grid_cols = {}; idx = 0
     for c in columns_sorted:
         L = counts[c]; grid_cols[c] = list(s[idx:idx+L]); idx += L
@@ -6565,7 +6673,7 @@ def Myszkowski_decode(text: str, key: str = "TOMATO") -> str:
     base = len(s)//cols; extra = len(s)%cols
     counts = {c: base for c in range(cols)}
     for i in range(extra):
-        counts[order_cols[i]] += 1
+        counts[i] += 1
     grid_cols = {}; idx = 0
     for c in order_cols:
         L = counts[c]; grid_cols[c] = list(s[idx:idx+L]); idx += L
@@ -8980,6 +9088,9 @@ def get_registry() -> List[CipherEntry]:
         CipherEntry("Homophonic Substitution", HomophonicSubstitution_encode, HomophonicSubstitution_decode, []),
         CipherEntry("Headline Puzzle", HeadlinePuzzle_encode, HeadlinePuzzle_decode, [P("filler_word","Filler word","headline")]),
         CipherEntry("Della Porta Disk", DellaPortaDisk_encode, DellaPortaDisk_decode, [P("keyword","Disk keyword","CIPHER"), P("shift","Shift","0")]),
+        CipherEntry("Wolseley Disk", WolseleyDisk_encode, WolseleyDisk_decode, [P("keyword","Disk keyword","WOLSELEY"), P("shift","Shift","0")]),
+        CipherEntry("Dorabella", Dorabella_encode, Dorabella_decode, [P("sep","Separator"," ")]),
+        CipherEntry("SLIDEX", SLIDEX_encode, SLIDEX_decode, [P("key","Grid key","SLIDEX"), P("row_labels","Row labels","12345"), P("col_labels","Column labels","12345"), P("sep","Separator"," ")]),
         CipherEntry("Alberti Disk", AlbertiDisk_encode, AlbertiDisk_decode, [P("outer","Outer alphabet","ABCDEFGHIJKLMNOPQRSTUVWXYZ"), P("inner_key","Inner key","CIPHER"), P("period","Period","5"), P("step","Step","1")]),
         CipherEntry("Wheatstone Cryptograph", WheatstoneCryptograph_encode, WheatstoneCryptograph_decode, [P("keyword","Keyword","WHEATSTONE"), P("indicator","Indicator","A")]),
         CipherEntry("Condi", Condi_encode, Condi_decode, [P("keyword","Keyword","CIPHER"), P("start","Start","0")]),
@@ -10401,8 +10512,6 @@ install_analysis_extensions()
 
 import math, random, time, json
 from collections import Counter
-import tkinter as tk
-from tkinter import ttk, messagebox
 try:
     from tkinter import filedialog as fd
 except Exception:
@@ -11272,8 +11381,6 @@ install_presets_toolbar()
 import time
 import itertools
 import json
-import tkinter as tk
-from tkinter import ttk, messagebox
 try:
     from tkinter import filedialog as fd
 except Exception:
