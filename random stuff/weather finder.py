@@ -1,4 +1,5 @@
 #do not use this to dox people please
+"script made for my friend terminus boy on roblox, he probably changed his user for the 50th time so I will adress him through his nickname"
 import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime, timedelta
@@ -40,13 +41,13 @@ def text_to_condition_fn(text):
     def is_clear(row): return (row.get('prcp') or 0) == 0
     def is_storm(row): return (row.get('prcp') or 0) >= 5
 
-    if "rain" in text or "piogg" in text:
+    if "rain" in text:
         return is_rain
-    if "snow" in text or "neve" in text:
+    if "snow" in text:
         return is_snow
-    if "clear" in text or "sun" in text or "sereno" in text:
+    if "clear" in text or "sun" in text:
         return is_clear
-    if "storm" in text or "tempor" in text:
+    if "storm" in text:
         return is_storm
     return lambda r: True
 
