@@ -3314,6 +3314,12 @@ def Vigenere_encode(text: str, key: str = "LEMON", keep_others: bool = True) -> 
 def Vigenere_decode(text: str, key: str = "LEMON", keep_others: bool = True) -> str:
     return _vig_core(text, key, False, keep_others)
 
+def ChiffreIndechiffrable_encode(text: str, key: str = "VIGENERE", keep_others: bool = True) -> str:
+    return Vigenere_encode(text, key, keep_others)
+
+def ChiffreIndechiffrable_decode(text: str, key: str = "VIGENERE", keep_others: bool = True) -> str:
+    return Vigenere_decode(text, key, keep_others)
+
 def Autokey_encode(text: str, key: str = "QUEENLY", keep_others: bool = True) -> str:
     stream = list(only_alpha(key))
     out = []
@@ -6502,6 +6508,29 @@ def Columnar_decode(text: str, key: str = "CIPHER") -> str:
                 out.append(grid_cols[c].pop(0))
     return "".join(out)
 
+def KeyphraseTransposition_encode(text: str, keyphrase: str = "THE QUICK BROWN FOX") -> str:
+    key = rotate_alpha_from_keyword(keyphrase or "KEYPHRASE")
+    order = _col_order(key)
+    out = []
+    for i in range(0, len(text), len(key)):
+        block = text[i:i+len(key)]
+        cols = sorted(range(len(block)), key=lambda c: (order[c], c))
+        out.extend(block[c] for c in cols)
+    return "".join(out)
+
+def KeyphraseTransposition_decode(text: str, keyphrase: str = "THE QUICK BROWN FOX") -> str:
+    key = rotate_alpha_from_keyword(keyphrase or "KEYPHRASE")
+    order = _col_order(key)
+    out = []
+    for i in range(0, len(text), len(key)):
+        block = text[i:i+len(key)]
+        cols = sorted(range(len(block)), key=lambda c: (order[c], c))
+        plain = [""] * len(block)
+        for src, col in enumerate(cols):
+            plain[col] = block[src]
+        out.extend(plain)
+    return "".join(out)
+
 def Myszkowski_encode(text: str, key: str = "TOMATO") -> str:
     s = "".join(ch for ch in text if not ch.isspace())
     cols = len(key)
@@ -6713,6 +6742,52 @@ def Bifid_decode(text: str, key: str = "KEYWORD", period: int | str = 5) -> str:
         cols = coords[half:]
         for r, c in zip(rows, cols):
             out.append(rev[(r, c)])
+    return "".join(out).lower()
+
+def BifidNoPeriod_encode(text: str, key: str = "KEYWORD") -> str:
+    s = only_alpha(text).replace('J', 'I')
+    return Bifid_encode(s, key, max(1, len(s)))
+
+def BifidNoPeriod_decode(text: str, key: str = "KEYWORD") -> str:
+    s = only_alpha(text).replace('J', 'I')
+    return Bifid_decode(s, key, max(1, len(s)))
+
+def ConjugatedBifid_encode(text: str, plain_key: str = "PLAIN", cipher_key: str = "CIPHER", period: int | str = 5) -> str:
+    if isinstance(period, str):
+        period = int(period.strip() or "5")
+    period = max(1, period)
+    plain_pos, _plain_rev = _bifid_square(plain_key)
+    _cipher_pos, cipher_rev = _bifid_square(cipher_key)
+    s = only_alpha(text).replace('J', 'I')
+    out = []
+    for block in chunk(s, period):
+        rows = []
+        cols = []
+        for ch in block:
+            r, c = plain_pos[ch]
+            rows.append(r); cols.append(c)
+        merged = rows + cols
+        for i in range(0, len(merged), 2):
+            out.append(cipher_rev[(merged[i], merged[i+1])])
+    return "".join(out).lower()
+
+def ConjugatedBifid_decode(text: str, plain_key: str = "PLAIN", cipher_key: str = "CIPHER", period: int | str = 5) -> str:
+    if isinstance(period, str):
+        period = int(period.strip() or "5")
+    period = max(1, period)
+    _plain_pos, plain_rev = _bifid_square(plain_key)
+    cipher_pos, _cipher_rev = _bifid_square(cipher_key)
+    s = only_alpha(text).replace('J', 'I')
+    out = []
+    for block in chunk(s, period):
+        coords = []
+        for ch in block:
+            coords.extend(cipher_pos[ch])
+        half = len(block)
+        rows = coords[:half]
+        cols = coords[half:]
+        for r, c in zip(rows, cols):
+            out.append(plain_rev[(r, c)])
     return "".join(out).lower()
 
 TRIFID_EXTRA = "."
@@ -8930,6 +9005,7 @@ def get_registry() -> List[CipherEntry]:
         CipherEntry("Lorenz Toy", LorenzToy_encode, LorenzToy_decode, [P("seed","Seed","LORENZ"), P("wheels","Wheel periods","41,31,29,26,23")]),
         CipherEntry("Complete Columnar", CompleteColumnar_encode, CompleteColumnar_decode, [P("key","Key","CIPHER"), P("pad","Pad","X")]),
         CipherEntry("Columnar Padded", ColumnarPadded_encode, ColumnarPadded_decode, [P("key","Key","CIPHER"), P("pad","Pad","X"), P("policy","Policy","minimal")]),
+        CipherEntry("Keyphrase Transposition", KeyphraseTransposition_encode, KeyphraseTransposition_decode, [P("keyphrase","Keyphrase","THE QUICK BROWN FOX")]),
         CipherEntry("Spiral Inward Route", SpiralInwardRoute_encode, SpiralInwardRoute_decode, [P("rows","Rows","5"), P("cols","Cols","5"), P("pad","Pad","X")]),
         CipherEntry("Spiral Outward Route", SpiralOutwardRoute_encode, SpiralOutwardRoute_decode, [P("rows","Rows","5"), P("cols","Cols","5"), P("pad","Pad","X")]),
         CipherEntry("Reading Order Route", ReadingOrderRoute_encode, ReadingOrderRoute_decode, [P("rows","Rows","5"), P("cols","Cols","5"), P("preset","Preset","column"), P("pad","Pad","X")]),
@@ -8949,6 +9025,7 @@ def get_registry() -> List[CipherEntry]:
 
         # Vigenère family
         CipherEntry("Vigenere", Vigenere_encode, Vigenere_decode, [P("key","Key","LEMON")]),
+        CipherEntry("Chiffre Indechiffrable", ChiffreIndechiffrable_encode, ChiffreIndechiffrable_decode, [P("key","Key","VIGENERE")]),
         CipherEntry("Vigenere Custom Alphabet", VigenereCustom_encode, VigenereCustom_decode, [P("key","Key","LEMON"), P("alphabet","Alphabet","ABCDEFGHIJKLMNOPQRSTUVWXYZ")]),
         CipherEntry("Vigenere Progressive", VigenereProgressive_encode, VigenereProgressive_decode, [P("key","Key","LEMON"), P("step","Step","1")]),
         CipherEntry("Autokey", Autokey_encode, Autokey_decode, [P("key","Key","QUEENLY")]),
@@ -9125,6 +9202,8 @@ def get_registry() -> List[CipherEntry]:
         CipherEntry("Double Transposition", DoubleTransposition_encode, DoubleTransposition_decode, [P("key1","Key 1","EXAMPLE"), P("key2","Key 2","KEYWORD")]),
         CipherEntry("Route Cipher", Route_encode, Route_decode, [P("rows","Rows","5"), P("cols","Cols","5")]),
         CipherEntry("Bifid", Bifid_encode, Bifid_decode, [P("key","Key","KEYWORD"), P("period","Period","5")]),
+        CipherEntry("Bifid No Period", BifidNoPeriod_encode, BifidNoPeriod_decode, [P("key","Key","KEYWORD")]),
+        CipherEntry("Conjugated Bifid", ConjugatedBifid_encode, ConjugatedBifid_decode, [P("plain_key","Plain key","PLAIN"), P("cipher_key","Cipher key","CIPHER"), P("period","Period","5")]),
         CipherEntry("Twin Bifid", TwinBifid_encode, TwinBifid_decode, [P("key1","Key 1","ALPHA"), P("key2","Key 2","OMEGA"), P("period","Period","5")]),
         CipherEntry("Trifid", Trifid_encode, Trifid_decode, [P("key","Key","KEYWORD"), P("period","Period","5")]),
         CipherEntry("Trifid Custom Alphabet", TrifidCustom_encode, TrifidCustom_decode, [P("alphabet","Alphabet","ABCDEFGHIJKLMNOPQRSTUVWXYZ."), P("period","Period","5")]),

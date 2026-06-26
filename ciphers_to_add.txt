@@ -5,7 +5,7 @@ Classical substitution / hand ciphers
 -------------------------------------
 1. AMSCO cipher [ADDED]
 2. Bazeries cipher [ADDED]
-3. Bifid variants: conjugated, 6x6, no-period mode
+3. Bifid variants: conjugated, 6x6, no-period mode [ADDED]
 4. Caesar with custom alphabet [ADDED]
 5. Caesar progressive shift [ADDED]
 6. Caesar random alphabet / keyed Caesar [ADDED: Keyed Caesar]
@@ -14,7 +14,7 @@ Classical substitution / hand ciphers
 8a. Alberti cipher disk [ADDED: Alberti Disk]
 9. Chaocipher [ADDED]
 10. Checkerboard transposition [ADDED]
-11. Chiffre Indechiffrable variants
+11. Chiffre Indechiffrable variants [ADDED]
 12. Cistercian numerals [ADDED]
 13. Clave cipher [ADDED]
 14. Codebook substitution with user dictionary [ADDED]
@@ -33,7 +33,7 @@ Classical substitution / hand ciphers
 27. Kamasutra cipher [ADDED]
 28. Keyed alphabet with arbitrary alphabets [ADDED]
 29. Keyed Caesar progressive [ADDED]
-30. Keyphrase transposition cipher
+30. Keyphrase transposition cipher [ADDED]
 31. Latin alphabet reverse with custom alphabets [ADDED]
 32. Letter-number A1Z26 variants [ADDED: basic A1Z26]
 33. Lorenz-style toy cipher [ADDED: Lorenz Toy]
