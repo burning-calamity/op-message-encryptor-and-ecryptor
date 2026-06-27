@@ -35,6 +35,27 @@ environment: pypi
 
 A mismatch in any of those fields can cause `invalid-publisher`.
 
+## Common mismatch shown by the current screenshots
+
+If the PyPI trusted publisher page shows:
+
+```text
+Workflow: python-tests.yml
+Environment name: pypi
+```
+
+but the GitHub Actions error log shows:
+
+```text
+workflow_ref: burning-calamity/op-message-encryptor-and-decryptor/.github/workflows/publish-to-pypi.yml@refs/heads/main
+environment: pypi
+```
+
+then PyPI is trusting the **test** workflow while GitHub is trying to publish
+from the **publish** workflow. Edit the PyPI trusted publisher and change the
+workflow filename from `python-tests.yml` to `publish-to-pypi.yml`, or remove the
+old trusted publisher entry and create a new one with `publish-to-pypi.yml`.
+
 ## First-time PyPI setup
 
 1. Log in to PyPI.

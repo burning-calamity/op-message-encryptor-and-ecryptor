@@ -98,7 +98,7 @@ Transposition / route ciphers
 86. Skip / permutation cipher [ADDED]
 87. Spiral route cipher [ADDED]
 88. Swagman transposition
-89. Turning cardan grille
+89. Turning cardan grille [ADDED: Cardan Grille, Turning Cardan Grille]
 90. Vertical transposition with numeric key [ADDED]
 
 Polygraphic / matrix ciphers

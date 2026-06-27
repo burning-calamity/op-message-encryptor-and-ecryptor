@@ -769,6 +769,108 @@ def Dorabella_decode(text: str, sep: str = " ") -> str:
             out.append(_DORABELLA_DEC.get(ch, ch))
     return "".join(out)
 
+_GOLDBUG_SYMBOLS = [
+    "5", "†", "8", "1", "0", "3", "4", "6", "*", "9", "(", ")", ";",
+    "?", "¶", "]", "[", "$", "7", ":", "2", "#", "-", ".", "!",
+]
+_GOLDBUG_ENC = dict(zip(ALPHA, _GOLDBUG_SYMBOLS))
+_GOLDBUG_DEC = {v: k for k, v in _GOLDBUG_ENC.items()}
+
+def GoldBug_encode(text: str, sep: str = " ") -> str:
+    """Edgar Allan Poe Gold-Bug style monoalphabetic symbol substitution."""
+    tokens = []
+    for ch in text:
+        cu = ch.upper()
+        if cu in _GOLDBUG_ENC:
+            tokens.append(_GOLDBUG_ENC[cu])
+        elif ch.isspace():
+            tokens.append("/")
+        else:
+            tokens.append(ch)
+    return sep.join(tokens) if sep else "".join(tokens)
+
+def GoldBug_decode(text: str, sep: str = " ") -> str:
+    out = []
+    tokens = text.split(sep) if sep else list(text)
+    for tok in tokens:
+        if tok == "/":
+            out.append(" ")
+        else:
+            out.append(_GOLDBUG_DEC.get(tok, tok))
+    return "".join(out)
+
+_LITERARY_DANCING_MEN_SYMBOLS = [
+    "𐂀", "𐂁", "𐂂", "𐂃", "𐂄", "𐂅", "𐂆", "𐂇", "𐂈", "𐂉", "𐂊", "𐂋", "𐂌",
+    "𐂍", "𐂎", "𐂏", "𐂐", "𐂑", "𐂒", "𐂓", "𐂔", "𐂕", "𐂖", "𐂗", "𐂘", "𐂙",
+]
+_LITERARY_DANCING_MEN_ENC = dict(zip(ALPHA, _LITERARY_DANCING_MEN_SYMBOLS))
+_LITERARY_DANCING_MEN_DEC = {v: k for k, v in _LITERARY_DANCING_MEN_ENC.items()}
+
+def DancingMenTokenized_encode(text: str, sep: str = " ") -> str:
+    """Sherlock Holmes Dancing Men style glyph substitution."""
+    tokens = []
+    for ch in text:
+        cu = ch.upper()
+        if cu in _LITERARY_DANCING_MEN_ENC:
+            tokens.append(_LITERARY_DANCING_MEN_ENC[cu])
+        elif ch.isspace():
+            tokens.append("/")
+        else:
+            tokens.append(ch)
+    return sep.join(tokens) if sep else "".join(tokens)
+
+def DancingMenTokenized_decode(text: str, sep: str = " ") -> str:
+    out = []
+    tokens = text.split(sep) if sep else list(text)
+    for tok in tokens:
+        if tok == "/":
+            out.append(" ")
+        else:
+            out.append(_LITERARY_DANCING_MEN_DEC.get(tok, tok))
+    return "".join(out)
+
+_MARY_WORD_CODES = {
+    "QUEEN": "900", "KING": "901", "SCOTLAND": "902", "ENGLAND": "903",
+    "FRANCE": "904", "LETTER": "905", "MESSENGER": "906", "PLOT": "907",
+    "PRISON": "908", "HELP": "909",
+}
+_MARY_WORD_DEC = {v: k for k, v in _MARY_WORD_CODES.items()}
+
+def MaryQueenScots_encode(text: str, sep: str = " ") -> str:
+    """Toy nomenclator inspired by Mary Queen of Scots ciphers.
+
+    Common words become three-digit code groups; remaining letters use
+    two-digit alphabet numbers.
+    """
+    tokens = []
+    for word in re.findall(r"[A-Za-z]+|[^A-Za-z]+", text):
+        up = word.upper()
+        if up in _MARY_WORD_CODES:
+            tokens.append(_MARY_WORD_CODES[up])
+        elif word.isalpha():
+            tokens.extend(f"{ALPHA.index(ch) + 1:02d}" for ch in up)
+        else:
+            for ch in word:
+                if ch.isspace():
+                    tokens.append("/")
+                elif ch.strip():
+                    tokens.append(ch)
+    return sep.join(tokens) if sep else "".join(tokens)
+
+def MaryQueenScots_decode(text: str, sep: str = " ") -> str:
+    tokens = text.split(sep) if sep else re.findall(r"9\d\d|\d\d|.", text)
+    out = []
+    for tok in tokens:
+        if tok == "/":
+            out.append(" ")
+        elif tok in _MARY_WORD_DEC:
+            out.append(_MARY_WORD_DEC[tok])
+        elif tok.isdigit() and len(tok) == 2 and 1 <= int(tok) <= 26:
+            out.append(ALPHA[int(tok) - 1])
+        else:
+            out.append(tok)
+    return "".join(out)
+
 def SLIDEX_encode(text: str, key: str = "SLIDEX", row_labels: str = "12345", col_labels: str = "12345", sep: str = " ") -> str:
     _, pos, _rev = _key_square_5(key)
     rows = ((row_labels or "") + "12345")[:5]
@@ -2740,6 +2842,43 @@ def GrilleMask_decode(text: str, rows: int | str = 5, cols: int | str = 5, mask:
     return "".join(out).rstrip((pad or "X")[0])
 
 
+def CardanGrille_encode(text: str, rows: int | str = 5, cols: int | str = 5, mask: str = "1000001000001000001000001", cover: str = "", pad: str = "X") -> str:
+    rows, cols = int(rows), int(cols)
+    holes = _parse_grille_mask(mask, rows, cols)
+    cell_count = rows * cols
+    block = len(holes)
+    padch = (pad or "X")[0]
+    cover_stream = cover or (padch * cell_count)
+    s = text
+    if len(s) % block:
+        s += padch * (block - len(s) % block)
+    out = []
+    cover_i = 0
+    for off in range(0, len(s), block):
+        grid = []
+        for _ in range(cell_count):
+            grid.append(cover_stream[cover_i % len(cover_stream)])
+            cover_i += 1
+        for ch, (r, c) in zip(s[off:off + block], holes):
+            grid[r * cols + c] = ch
+        out.append("".join(grid))
+    return "".join(out)
+
+
+def CardanGrille_decode(text: str, rows: int | str = 5, cols: int | str = 5, mask: str = "1000001000001000001000001", cover: str = "", pad: str = "X") -> str:
+    rows, cols = int(rows), int(cols)
+    holes = _parse_grille_mask(mask, rows, cols)
+    cell_count = rows * cols
+    if len(text) % cell_count:
+        return "Err:ciphertext length must be a multiple of rows*cols"
+    out = []
+    for off in range(0, len(text), cell_count):
+        block = text[off:off + cell_count]
+        for r, c in holes:
+            out.append(block[r * cols + c])
+    return "".join(out).rstrip((pad or "X")[0])
+
+
 def _rotate_pos_cw(r: int, c: int, n: int) -> Tuple[int, int]:
     return c, n - 1 - r
 
@@ -2801,6 +2940,14 @@ def FleissnerGrille_decode(text: str, size: int | str = 4, mask: str = "11001100
                 out.append(grid[r][c])
             current = [_rotate_pos_cw(r, c, size) for r, c in current]
     return "".join(out).rstrip((pad or "X")[0])
+
+
+def TurningCardanGrille_encode(text: str, size: int | str = 4, mask: str = "1100110000000000", pad: str = "X") -> str:
+    return FleissnerGrille_encode(text, size, mask, pad)
+
+
+def TurningCardanGrille_decode(text: str, size: int | str = 4, mask: str = "1100110000000000", pad: str = "X") -> str:
+    return FleissnerGrille_decode(text, size, mask, pad)
 
 
 def RasterBits_encode(text: str, width: int | str = 8, on: str = "#", off: str = ".") -> str:
@@ -9090,6 +9237,9 @@ def get_registry() -> List[CipherEntry]:
         CipherEntry("Della Porta Disk", DellaPortaDisk_encode, DellaPortaDisk_decode, [P("keyword","Disk keyword","CIPHER"), P("shift","Shift","0")]),
         CipherEntry("Wolseley Disk", WolseleyDisk_encode, WolseleyDisk_decode, [P("keyword","Disk keyword","WOLSELEY"), P("shift","Shift","0")]),
         CipherEntry("Dorabella", Dorabella_encode, Dorabella_decode, [P("sep","Separator"," ")]),
+        CipherEntry("Gold-Bug", GoldBug_encode, GoldBug_decode, [P("sep","Separator"," ")]),
+        CipherEntry("Dancing Men Tokenized", DancingMenTokenized_encode, DancingMenTokenized_decode, [P("sep","Separator"," ")]),
+        CipherEntry("Mary Queen of Scots Nomenclator", MaryQueenScots_encode, MaryQueenScots_decode, [P("sep","Separator"," ")]),
         CipherEntry("SLIDEX", SLIDEX_encode, SLIDEX_decode, [P("key","Grid key","SLIDEX"), P("row_labels","Row labels","12345"), P("col_labels","Column labels","12345"), P("sep","Separator"," ")]),
         CipherEntry("Alberti Disk", AlbertiDisk_encode, AlbertiDisk_decode, [P("outer","Outer alphabet","ABCDEFGHIJKLMNOPQRSTUVWXYZ"), P("inner_key","Inner key","CIPHER"), P("period","Period","5"), P("step","Step","1")]),
         CipherEntry("Wheatstone Cryptograph", WheatstoneCryptograph_encode, WheatstoneCryptograph_decode, [P("keyword","Keyword","WHEATSTONE"), P("indicator","Indicator","A")]),
@@ -9122,7 +9272,9 @@ def get_registry() -> List[CipherEntry]:
         CipherEntry("Reading Order Route", ReadingOrderRoute_encode, ReadingOrderRoute_decode, [P("rows","Rows","5"), P("cols","Cols","5"), P("preset","Preset","column"), P("pad","Pad","X")]),
         CipherEntry("Rotating Square Route", RotatingSquareRoute_encode, RotatingSquareRoute_decode, [P("size","Size","5"), P("turns","Turns","1"), P("pad","Pad","X")]),
         CipherEntry("Grille Mask", GrilleMask_encode, GrilleMask_decode, [P("rows","Rows","5"), P("cols","Cols","5"), P("mask","Mask","1000001000001000001000001"), P("pad","Pad","X")]),
+        CipherEntry("Cardan Grille", CardanGrille_encode, CardanGrille_decode, [P("rows","Rows","5"), P("cols","Cols","5"), P("mask","Mask","1000001000001000001000001"), P("cover","Cover text",""), P("pad","Pad","X")]),
         CipherEntry("Fleissner Grille", FleissnerGrille_encode, FleissnerGrille_decode, [P("size","Size","4"), P("mask","Mask","1100110000000000"), P("pad","Pad","X")]),
+        CipherEntry("Turning Cardan Grille", TurningCardanGrille_encode, TurningCardanGrille_decode, [P("size","Size","4"), P("mask","Mask","1100110000000000"), P("pad","Pad","X")]),
         CipherEntry("Raster Bits", RasterBits_encode, RasterBits_decode, [P("width","Width","8"), P("on","On char","#"), P("off","Off char",".")]),
         CipherEntry("Hagelin Toy", HagelinToy_encode, HagelinToy_decode, [P("seed","Seed","HAGELIN"), P("wheels","Wheels","17,19,21,23,25,26")]),
         CipherEntry("AMSCO", AMSCO_encode, AMSCO_decode, [P("key","Key","CIPHER"), P("start_len","Starting cell length","1")]),
