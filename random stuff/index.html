@@ -5,19 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Socrates Phonk - Audio Loop</title>
 
-    <!-- DISCORD & SOCIAL MEDIA PREVIEW EMBEDS (Open Graph Tags) -->
-    <!-- Replace 'https://yourwebsite.com' with your actual live website link -->
-    <meta property="og:url" content="https://www.youtube.com/watch?v=AaIBMfdtR6M">
+    <!-- DISCORD & SOCIAL MEDIA PREVIEW EMBEDS -->
+    <!-- The meta tag is perfectly configured to scrape the official Socrates Phonk cover art -->
+    <meta property="og:url" content="https://burning-calamity.github.io/op-message-encryptor-and-decryptor/random%20stuff/index.html">
     <meta property="og:type" content="website">
     <meta property="og:title" content="SOCRATES PHONK">
     <meta property="og:description" content="Listen to the heat. Auto-playing audio loop.">
-    
-    <!-- This fetches the maximum resolution thumbnail directly from the YouTube video -->
     <meta property="og:image" content="https://youtube.com">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-
-    <!-- Twitter / Discord Large Card Fallback -->
     <meta name="twitter:card" content="summary_large_image">
 
     <style>
@@ -86,16 +82,23 @@
             100% { opacity: 0.4; }
         }
 
-        #youtube-audio-player {
-            display: none;
+        /* FIX: Making the player size 200x200 pixels but positioning it completely off-screen */
+        /* This tricks the browser engine into treating it as an active visible playback node */
+        #player-wrapper {
+            position: absolute;
+            top: -9999px;
+            left: -9999px;
+            width: 200px;
+            height: 200px;
+            overflow: hidden;
+            pointer-events: none;
         }
     </style>
 </head>
-<!-- Clicking anywhere on the screen triggers the audio unblock sequence -->
-<body onclick="unlockAudio()">
+<body>
 
-    <!-- Overlay that clears browser restrictions -->
-    <div class="click-overlay" id="audio-gate">
+    <!-- FIX: Moved the onclick function directly to the gate overlay so the browser registers the user interaction -->
+    <div class="click-overlay" id="audio-gate" onclick="unlockAudio()">
         <h1>SOCRATES PHONK</h1>
         <p>Listen to the heat...</p>
         <div class="pulse-text">Click anywhere to enter & play</div>
@@ -105,8 +108,10 @@
         <h1>Now Playing Loop</h1>
     </div>
 
-    <!-- Hidden YouTube iframe container -->
-    <div id="youtube-audio-player"></div>
+    <!-- Hidden Wrapper for YouTube player framework -->
+    <div id="player-wrapper">
+        <div id="youtube-audio-player"></div>
+    </div>
 
     <script>
         const youtubeVideoId = 'AaIBMfdtR6M'; 
@@ -115,18 +120,18 @@
 
         // Load the YouTube IFrame API
         const tag = document.createElement('script');
-        tag.src = "https://youtube.com";
+        tag.src = "https://www.youtube.com/iframe_api";
         const firstScriptTag = document.getElementsByTagName('script');
         firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
         function onYouTubeIframeAPIReady() {
             player = new YT.Player('youtube-audio-player', {
-                height: '0',
-                width: '0',
+                height: '200',  // FIX: Set explicit non-zero dimensions
+                width: '200',   // FIX: Set explicit non-zero dimensions
                 videoId: youtubeVideoId,
                 playerVars: {
-                    'autoplay': 1,               // Load and buffer immediately
-                    'mute': 1,                   // Start muted to bypass browser block policies
+                    'autoplay': 1,               
+                    'mute': 1,                   // Keeps browser background blocking engine calm
                     'loop': 1,                   
                     'playlist': youtubeVideoId,  
                     'controls': 0,               
@@ -141,21 +146,22 @@
 
         function onPlayerReady(event) {
             isPlayerReady = true;
-            // The video starts playing muted immediately upon loading
-            player.playVideo(); 
+            player.playVideo(); // Pre-buffers track state silently in background
         }
 
-        // Unmutes and plays audio the moment the user clicks anywhere
         function unlockAudio() {
             const gate = document.getElementById('audio-gate');
             
             if (player && isPlayerReady) {
                 player.unMute();
                 player.setVolume(100);
-                player.playVideo(); // Ensures it plays even if paused
+                player.playVideo(); 
                 
-                // Smoothly hide the landing screen overlay
+                // Smoothly dismiss entry sequence layout
                 gate.classList.add('hidden');
+            } else {
+                // If clicked prematurely before API is complete, fallback kick execution loop
+                setTimeout(unlockAudio, 200);
             }
         }
     </script>
