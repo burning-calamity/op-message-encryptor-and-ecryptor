@@ -4,17 +4,23 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>Loading...</title>
+  <!-- Static preview data -->
+  <title>YouTube Audio</title>
 
-  <meta property="og:type" content="website" />
-  <meta property="og:title" content="YouTube Audio" />
-  <meta property="og:description" content="Listen to this YouTube audio." />
-  <meta property="og:image" content="" />
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="YouTube Audio">
+  <meta property="og:description" content="Listen to this YouTube audio.">
+  <meta property="og:image" content="https://i.ytimg.com/vi/AaIBMfdtR6M/hqdefault.jpg">
+  <meta property="og:image:secure_url" content="https://i.ytimg.com/vi/CShopT9QUzw/hqdefault.jpg">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="480">
+  <meta property="og:image:height" content="360">
+  <meta property="og:url" content="https://burning-calamity.github.io/op-message-encryptor-and-decryptor/tests/">
 
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="YouTube Audio" />
-  <meta name="twitter:description" content="Listen to this YouTube audio." />
-  <meta name="twitter:image" content="" />
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="YouTube Audio">
+  <meta name="twitter:description" content="Listen to this YouTube audio.">
+  <meta name="twitter:image" content="https://i.ytimg.com/vi/CShopT9QUzw/hqdefault.jpg">
 
   <style>
     body {
@@ -47,7 +53,6 @@
       max-width: 500px;
       border-radius: 12px;
       margin-bottom: 20px;
-      background: #222;
     }
 
     button {
@@ -67,104 +72,41 @@
   <div id="player"></div>
 
   <div class="box">
-    <img id="thumbnail" alt="YouTube thumbnail">
+    <img id="thumbnail" src="https://i.ytimg.com/vi/CShopT9QUzw/hqdefault.jpg" alt="YouTube thumbnail">
     <h1 id="videoTitle">Loading...</h1>
     <p id="status">Trying to play audio automatically...</p>
     <button id="playButton">Click to play audio</button>
   </div>
 
   <script>
-    /*
-      Change only this variable.
-    */
-    const videoLink = "https://youtu.be/CShopT9QUzw?list=RDMM";
+    const videoLink = "https://www.youtube.com/watch?v=CShopT9QUzw";
 
     let videoId;
     let player;
     let hasStarted = false;
 
     function getYouTubeVideoId(url) {
-      try {
-        const parsedUrl = new URL(url);
+      const parsedUrl = new URL(url);
 
-        if (parsedUrl.hostname.includes("youtube.com")) {
-          if (parsedUrl.pathname === "/watch") {
-            return parsedUrl.searchParams.get("v");
-          }
-
-          if (parsedUrl.pathname.startsWith("/embed/")) {
-            return parsedUrl.pathname.split("/embed/")[1].split("/")[0];
-          }
-
-          if (parsedUrl.pathname.startsWith("/shorts/")) {
-            return parsedUrl.pathname.split("/shorts/")[1].split("/")[0];
-          }
+      if (parsedUrl.hostname.includes("youtube.com")) {
+        if (parsedUrl.pathname === "/watch") {
+          return parsedUrl.searchParams.get("v");
         }
 
-        if (parsedUrl.hostname.includes("youtu.be")) {
-          return parsedUrl.pathname.replace("/", "").split("?")[0];
+        if (parsedUrl.pathname.startsWith("/embed/")) {
+          return parsedUrl.pathname.split("/embed/")[1].split("/")[0];
         }
 
-        return null;
-      } catch {
-        return null;
-      }
-    }
-
-    function setMeta(selector, value) {
-      const tag = document.querySelector(selector);
-      if (tag) {
-        tag.setAttribute("content", value);
-      }
-    }
-
-    function setThumbnail(videoId) {
-      const thumbnail = document.getElementById("thumbnail");
-
-      const thumbnails = [
-        `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-        `https://img.youtube.com/vi/${videoId}/sddefault.jpg`,
-        `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
-        `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
-        `https://img.youtube.com/vi/${videoId}/default.jpg`
-      ];
-
-      let index = 0;
-
-      function tryNextThumbnail() {
-        if (index >= thumbnails.length) {
-          thumbnail.style.display = "none";
-          return;
+        if (parsedUrl.pathname.startsWith("/shorts/")) {
+          return parsedUrl.pathname.split("/shorts/")[1].split("/")[0];
         }
-
-        const testImage = new Image();
-
-        testImage.onload = function () {
-          /*
-            maxresdefault sometimes loads a tiny "not available" image.
-            If it is too small, skip it.
-          */
-          if (testImage.naturalWidth < 120 || testImage.naturalHeight < 90) {
-            index++;
-            tryNextThumbnail();
-            return;
-          }
-
-          thumbnail.src = thumbnails[index];
-
-          setMeta('meta[property="og:image"]', thumbnails[index]);
-          setMeta('meta[name="twitter:image"]', thumbnails[index]);
-        };
-
-        testImage.onerror = function () {
-          index++;
-          tryNextThumbnail();
-        };
-
-        testImage.src = thumbnails[index];
       }
 
-      tryNextThumbnail();
+      if (parsedUrl.hostname.includes("youtu.be")) {
+        return parsedUrl.pathname.replace("/", "").split("?")[0];
+      }
+
+      return null;
     }
 
     videoId = getYouTubeVideoId(videoLink);
@@ -172,28 +114,18 @@
     if (!videoId) {
       document.title = "Invalid YouTube link";
       document.getElementById("videoTitle").textContent = "Invalid YouTube link";
-      document.getElementById("status").textContent = "Please check the videoLink variable.";
+      document.getElementById("status").textContent = "Invalid video link.";
       throw new Error("Invalid YouTube link");
     }
 
-    setThumbnail(videoId);
+    const thumbnailUrl = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+    document.getElementById("thumbnail").src = thumbnailUrl;
 
     fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(videoLink)}&format=json`)
       .then(response => response.json())
       .then(data => {
-        const title = data.title;
-
-        document.title = title;
-        document.getElementById("videoTitle").textContent = title;
-
-        setMeta('meta[property="og:title"]', title);
-        setMeta('meta[name="twitter:title"]', title);
-
-        if (data.thumbnail_url) {
-          document.getElementById("thumbnail").src = data.thumbnail_url;
-          setMeta('meta[property="og:image"]', data.thumbnail_url);
-          setMeta('meta[name="twitter:image"]', data.thumbnail_url);
-        }
+        document.title = data.title;
+        document.getElementById("videoTitle").textContent = data.title;
       })
       .catch(() => {
         document.title = "YouTube Audio";
