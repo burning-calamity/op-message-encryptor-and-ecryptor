@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to My Site</title>
+    <style>
+        /* Basic styling to center content and create an elegant backdrop */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e1e2f, #0f0f1a);
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            text-align: center;
+            z-index: 2;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            letter-spacing: 2px;
+        }
+
+        /* Call-to-action button that triggers the audio */
+        .enter-btn {
+            background-color: #ff0055;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 0, 85, 0.4);
+            transition: transform 0.2s, background-color 0.2s;
+        }
+
+        .enter-btn:hover {
+            background-color: #e6004c;
+            transform: scale(1.05);
+        }
+
+        /* Keeps the YouTube player hidden from view */
+        #youtube-audio-player {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Welcome to My Website</h1>
+        <button class="enter-btn" id="start-btn" onclick="connectAndPlay()">Enter Site</button>
+    </div>
+
+    <!-- Hidden container where the YouTube player loads -->
+    <div id="youtube-audio-player"></div>
+
+    <script>
+        // 1. Paste your target YouTube Video ID here
+        // Example: if the URL is ://youtube.com, the ID is 'dQw4w9WgXcQ'
+        const youtubeVideoId = 'dQw4w9WgXcQ'; 
+
+        let player;
+
+        // 2. Load the official YouTube IFrame Player API asynchronously
+        const tag = document.createElement('script');
+        tag.src = "https://youtube.com";
+        const firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+        // 3. This function creates the <iframe> player once the API library downloads
+        function onYouTubeIframeAPIReady() {
+            player = new YT.Player('youtube-audio-player', {
+                height: '0',
+                width: '0',
+                videoId: youtubeVideoId,
+                playerVars: {
+                    'autoplay': 0,       // Keep it paused initially until interaction
+                    'controls': 0,       // Hide video control overlays
+                    'disablekb': 1,     // Disable keyboard controls
+                    'fs': 0,            // Disable full screen option
+                    'modestbranding': 1 // Remove excessive YouTube logos
+                },
+                events: {
+                    'onReady': onPlayerReady
+                }
+            });
+        }
+
+        // Variable to track if the API is fully prepared to play
+        let isPlayerReady = false;
+
+        function onPlayerReady(event) {
+            isPlayerReady = true;
+        }
+
+        // 4. Executed when the user clicks the "Enter Site" button
+        function connectAndPlay() {
+            const startBtn = document.getElementById('start-btn');
+            
+            if (isPlayerReady && player) {
+                player.playVideo();
+                
+                // Change UI layout subtly to signal successful entry
+                startBtn.innerText = "Playing...";
+                startBtn.style.background = "#333";
+                startBtn.style.cursor = "default";
+                startBtn.disabled = true;
+            } else {
+                // Fallback catch if the user clicks instantly before the API loads
+                startBtn.innerText = "Loading Audio... Click Again";
+            }
+        }
+    </script>
+</body>
+</html>
