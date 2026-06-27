@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome to My Site</title>
+    <title>Socrates Phonk</title>
     <style>
-        /* Basic styling to center content and create an elegant backdrop */
         body {
             margin: 0;
             padding: 0;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1e1e2f, #0f0f1a);
+            background: linear-gradient(135deg, #0f0c20, #060210);
             color: #ffffff;
             display: flex;
             justify-content: center;
@@ -25,31 +24,38 @@
         }
 
         h1 {
-            font-size: 2.5rem;
-            margin-bottom: 20px;
-            letter-spacing: 2px;
+            font-size: 2.8rem;
+            margin-bottom: 10px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: #00ffcc;
+            text-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
         }
 
-        /* Call-to-action button that triggers the audio */
+        p {
+            font-size: 1.1rem;
+            color: #8a85a5;
+            margin-bottom: 30px;
+        }
+
         .enter-btn {
-            background-color: #ff0055;
-            color: white;
+            background: linear-gradient(45deg, #00ffcc, #0077ff);
+            color: #060210;
             border: none;
-            padding: 15px 40px;
-            font-size: 1.2rem;
+            padding: 18px 50px;
+            font-size: 1.3rem;
             font-weight: bold;
-            border-radius: 30px;
+            border-radius: 40px;
             cursor: pointer;
-            box-shadow: 0 4px 15px rgba(255, 0, 85, 0.4);
-            transition: transform 0.2s, background-color 0.2s;
+            box-shadow: 0 5px 25px rgba(0, 255, 204, 0.4);
+            transition: all 0.3s ease;
         }
 
         .enter-btn:hover {
-            background-color: #e6004c;
-            transform: scale(1.05);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 30px rgba(0, 255, 204, 0.6);
         }
 
-        /* Keeps the YouTube player hidden from view */
         #youtube-audio-player {
             display: none;
         }
@@ -58,38 +64,39 @@
 <body>
 
     <div class="container">
-        <h1>Welcome to My Website</h1>
-        <button class="enter-btn" id="start-btn" onclick="connectAndPlay()">Enter Site</button>
+        <h1>SOCRATES PHONK</h1>
+        <p>Listen to the heat...</p>
+        <button class="enter-btn" id="start-btn" onclick="activateAudio()">Listen</button>
     </div>
 
-    <!-- Hidden container where the YouTube player loads -->
+    <!-- Hidden YouTube iframe container -->
     <div id="youtube-audio-player"></div>
 
     <script>
-        // 1. Paste your target YouTube Video ID here
-        // Example: if the URL is ://youtube.com, the ID is 'dQw4w9WgXcQ'
+        // Target Video ID for Socrates Phonk
         const youtubeVideoId = 'AaIBMfdtR6M'; 
-
         let player;
+        let isPlayerReady = false;
 
-        // 2. Load the official YouTube IFrame Player API asynchronously
+        // Load the YouTube IFrame API
         const tag = document.createElement('script');
-        tag.src = "https://youtube.com";
-        const firstScriptTag = document.getElementsByTagName('script')[0];
+        tag.src = "https://www.youtube.com/iframe_api";
+        const firstScriptTag = document.getElementsByTagName('script');
         firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
-        // 3. This function creates the <iframe> player once the API library downloads
+        // Configure player to loop seamlessly and play as soon as it initializes
         function onYouTubeIframeAPIReady() {
             player = new YT.Player('youtube-audio-player', {
                 height: '0',
                 width: '0',
                 videoId: youtubeVideoId,
                 playerVars: {
-                    'autoplay': 0,       // Keep it paused initially until interaction
-                    'controls': 0,       // Hide video control overlays
-                    'disablekb': 1,     // Disable keyboard controls
-                    'fs': 0,            // Disable full screen option
-                    'modestbranding': 1 // Remove excessive YouTube logos
+                    'autoplay': 1,               // Forces autoplay instantly upon loading
+                    'loop': 1,                   // Enables looping
+                    'playlist': youtubeVideoId,  // YouTube requires the video ID repeated here to loop a single video
+                    'controls': 0,               
+                    'disablekb': 1,             
+                    'modestbranding': 1
                 },
                 events: {
                     'onReady': onPlayerReady
@@ -97,28 +104,26 @@
             });
         }
 
-        // Variable to track if the API is fully prepared to play
-        let isPlayerReady = false;
-
+        // Fires the exact moment the video loads and is ready for playback
         function onPlayerReady(event) {
             isPlayerReady = true;
+            // Attempt an unmuted play immediately in case the browser allows it
+            player.playVideo(); 
         }
 
-        // 4. Executed when the user clicks the "Enter Site" button
-        function connectAndPlay() {
+        // Activates/unblocks audio instantly when the user clicks the layout
+        function activateAudio() {
             const startBtn = document.getElementById('start-btn');
             
-            if (isPlayerReady && player) {
+            if (player) {
                 player.playVideo();
-                
-                // Change UI layout subtly to signal successful entry
-                startBtn.innerText = "Playing...";
-                startBtn.style.background = "#333";
-                startBtn.style.cursor = "default";
+                startBtn.innerText = "Playing Loop...";
+                startBtn.style.background = "#1a1630";
+                startBtn.style.color = "#666";
+                startBtn.style.boxShadow = "none";
                 startBtn.disabled = true;
             } else {
-                // Fallback catch if the user clicks instantly before the API loads
-                startBtn.innerText = "Loading Audio... Click Again";
+                startBtn.innerText = "Loading track...";
             }
         }
     </script>
