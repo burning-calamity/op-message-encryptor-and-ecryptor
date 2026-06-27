@@ -6,20 +6,10 @@
 
   <title>Loading...</title>
 
-  <!-- 
-    IMPORTANT:
-    Most apps like Discord, WhatsApp, Facebook, etc. do NOT run JavaScript
-    when creating link previews.
-
-    So these Open Graph tags cannot be fully automatic in pure HTML/JS.
-    They are updated for the browser, but link previews usually need
-    server-side generated meta tags.
-  -->
   <meta property="og:type" content="website" />
   <meta property="og:title" content="YouTube Audio" />
   <meta property="og:description" content="Listen to this YouTube audio." />
   <meta property="og:image" content="" />
-  <meta property="og:url" content="" />
 
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="YouTube Audio" />
@@ -57,6 +47,7 @@
       max-width: 500px;
       border-radius: 12px;
       margin-bottom: 20px;
+      background: #222;
     }
 
     button {
@@ -76,7 +67,7 @@
   <div id="player"></div>
 
   <div class="box">
-    <img id="thumbnail" src="" alt="YouTube thumbnail">
+    <img id="thumbnail" alt="YouTube thumbnail">
     <h1 id="videoTitle">Loading...</h1>
     <p id="status">Trying to play audio automatically...</p>
     <button id="playButton">Click to play audio</button>
@@ -93,24 +84,87 @@
     let hasStarted = false;
 
     function getYouTubeVideoId(url) {
-      const patterns = [
-        /youtube\.com\/watch\?v=([^&]+)/,
-        /youtu\.be\/([^?&]+)/,
-        /youtube\.com\/embed\/([^?&]+)/,
-        /youtube\.com\/shorts\/([^?&]+)/
-      ];
+      try {
+        const parsedUrl = new URL(url);
 
-      for (const pattern of patterns) {
-        const match = url.match(pattern);
-        if (match) return match[1];
+        if (parsedUrl.hostname.includes("youtube.com")) {
+          if (parsedUrl.pathname === "/watch") {
+            return parsedUrl.searchParams.get("v");
+          }
+
+          if (parsedUrl.pathname.startsWith("/embed/")) {
+            return parsedUrl.pathname.split("/embed/")[1].split("/")[0];
+          }
+
+          if (parsedUrl.pathname.startsWith("/shorts/")) {
+            return parsedUrl.pathname.split("/shorts/")[1].split("/")[0];
+          }
+        }
+
+        if (parsedUrl.hostname.includes("youtu.be")) {
+          return parsedUrl.pathname.replace("/", "").split("?")[0];
+        }
+
+        return null;
+      } catch {
+        return null;
       }
-
-      return null;
     }
 
     function setMeta(selector, value) {
       const tag = document.querySelector(selector);
-      if (tag) tag.setAttribute("content", value);
+      if (tag) {
+        tag.setAttribute("content", value);
+      }
+    }
+
+    function setThumbnail(videoId) {
+      const thumbnail = document.getElementById("thumbnail");
+
+      const thumbnails = [
+        `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+        `https://img.youtube.com/vi/${videoId}/sddefault.jpg`,
+        `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+        `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
+        `https://img.youtube.com/vi/${videoId}/default.jpg`
+      ];
+
+      let index = 0;
+
+      function tryNextThumbnail() {
+        if (index >= thumbnails.length) {
+          thumbnail.style.display = "none";
+          return;
+        }
+
+        const testImage = new Image();
+
+        testImage.onload = function () {
+          /*
+            maxresdefault sometimes loads a tiny "not available" image.
+            If it is too small, skip it.
+          */
+          if (testImage.naturalWidth < 120 || testImage.naturalHeight < 90) {
+            index++;
+            tryNextThumbnail();
+            return;
+          }
+
+          thumbnail.src = thumbnails[index];
+
+          setMeta('meta[property="og:image"]', thumbnails[index]);
+          setMeta('meta[name="twitter:image"]', thumbnails[index]);
+        };
+
+        testImage.onerror = function () {
+          index++;
+          tryNextThumbnail();
+        };
+
+        testImage.src = thumbnails[index];
+      }
+
+      tryNextThumbnail();
     }
 
     videoId = getYouTubeVideoId(videoLink);
@@ -122,28 +176,24 @@
       throw new Error("Invalid YouTube link");
     }
 
-    const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-
-    document.getElementById("thumbnail").src = thumbnailUrl;
-
-    setMeta('meta[property="og:image"]', thumbnailUrl);
-    setMeta('meta[name="twitter:image"]', thumbnailUrl);
-    setMeta('meta[property="og:url"]', window.location.href);
+    setThumbnail(videoId);
 
     fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(videoLink)}&format=json`)
       .then(response => response.json())
       .then(data => {
         const title = data.title;
-        const thumbnail = data.thumbnail_url || thumbnailUrl;
 
         document.title = title;
         document.getElementById("videoTitle").textContent = title;
-        document.getElementById("thumbnail").src = thumbnail;
 
         setMeta('meta[property="og:title"]', title);
         setMeta('meta[name="twitter:title"]', title);
-        setMeta('meta[property="og:image"]', thumbnail);
-        setMeta('meta[name="twitter:image"]', thumbnail);
+
+        if (data.thumbnail_url) {
+          document.getElementById("thumbnail").src = data.thumbnail_url;
+          setMeta('meta[property="og:image"]', data.thumbnail_url);
+          setMeta('meta[name="twitter:image"]', data.thumbnail_url);
+        }
       })
       .catch(() => {
         document.title = "YouTube Audio";
