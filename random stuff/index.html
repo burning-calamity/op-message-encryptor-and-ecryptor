@@ -1,171 +1,160 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Socrates Phonk - Audio Loop</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- DISCORD & SOCIAL MEDIA PREVIEW EMBEDS -->
-    <meta property="og:url" content="https://burning-calamity.github.io/op-message-encryptor-and-decryptor/random%20stuff/index.html">
-    <meta property="og:type" content="website">
-    <meta property="og:title" content="SOCRATES PHONK">
-    <meta property="og:description" content="Listen to the heat. Auto-playing audio loop.">
-    <!-- FIX: Pulled directly from YouTube's HQ server asset file for this exact video -->
-    <meta property="og:image" content="https://youtube.com">
-    <meta property="og:image:width" content="480">
-    <meta property="og:image:height" content="360">
-    <meta name="twitter:card" content="summary_large_image">
+  <title>Loading video...</title>
 
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #0f0c20, #060210);
-            color: #ffffff;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            overflow: hidden;
-        }
+  <!-- Link preview / Discord / WhatsApp / Facebook / etc. -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="YouTube Audio" />
+  <meta property="og:description" content="Listen to this YouTube audio." />
+  <meta property="og:image" content="https://img.youtube.com/vi/AaIBMfdtR6M/maxresdefault.jpg" />
+  <meta property="og:url" content="https://youtu.be/AaIBMfdtR6M" />
 
-        .click-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(15, 12, 32, 0.98);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 999;
-            cursor: pointer;
-            transition: opacity 0.5s ease, visibility 0.5s ease;
-        }
+  <!-- Twitter / X preview -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="YouTube Audio" />
+  <meta name="twitter:description" content="Listen to this YouTube audio." />
+  <meta name="twitter:image" content="https://img.youtube.com/vi/AaIBMfdtR6M/maxresdefault.jpg" />
 
-        .click-overlay.hidden {
-            opacity: 0;
-            visibility: hidden;
-            pointer-events: none;
-        }
+  <style>
+    body {
+      margin: 0;
+      height: 100vh;
+      background: #111;
+      color: white;
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
 
-        h1 {
-            font-size: 2.8rem;
-            margin-bottom: 10px;
-            letter-spacing: 3px;
-            text-transform: uppercase;
-            color: #00ffcc;
-            text-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
-        }
+    #player {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
 
-        p {
-            font-size: 1.2rem;
-            color: #8a85a5;
-            margin: 0 0 20px 0;
-        }
+    .box {
+      max-width: 600px;
+      padding: 20px;
+    }
 
-        .pulse-text {
-            font-size: 0.9rem;
-            color: #00ffcc;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            animation: pulse 1.5s infinite;
-        }
+    img {
+      width: 100%;
+      max-width: 500px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
 
-        @keyframes pulse {
-            0% { opacity: 0.4; }
-            50% { opacity: 1; }
-            100% { opacity: 0.4; }
-        }
-
-        /* The frame is kept safe from layout engine visibility drops by hiding offscreen */
-        #player-wrapper {
-            position: absolute;
-            top: -9999px;
-            left: -9999px;
-            width: 200px;
-            height: 200px;
-            overflow: hidden;
-            pointer-events: none;
-        }
-    </style>
+    button {
+      padding: 14px 24px;
+      font-size: 18px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: white;
+      color: black;
+      display: none;
+    }
+  </style>
 </head>
+
 <body>
+  <div id="player"></div>
 
-    <!-- FIX: Moved onclick event handling here so the action bubbles properly -->
-    <div class="click-overlay" id="audio-gate" onclick="unlockAudio()">
-        <h1>SOCRATES PHONK</h1>
-        <p>Listen to the heat...</p>
-        <div class="pulse-text">Click anywhere to enter & play</div>
-    </div>
+  <div class="box">
+    <img src="https://img.youtube.com/vi/AaIBMfdtR6M/maxresdefault.jpg" alt="YouTube thumbnail">
+    <h1 id="videoTitle">Loading video...</h1>
+    <p id="status">Trying to play audio automatically...</p>
+    <button id="playButton">Click to play audio</button>
+  </div>
 
-    <div class="main-content">
-        <h1>Now Playing Loop</h1>
-        <p style="color: #666; font-size: 0.9rem;">Audio running through embedded wrapper</p>
-    </div>
+  <script>
+    const videoId = "AaIBMfdtR6M";
+    const videoUrl = "https://www.youtube.com/watch?v=" + videoId;
 
-    <div id="player-wrapper">
-        <div id="youtube-audio-player"></div>
-    </div>
+    let player;
+    let hasStarted = false;
 
-    <script>
-        const youtubeVideoId = 'AaIBMfdtR6M'; 
-        let player;
-        let isPlayerReady = false;
+    // Get YouTube video title and set browser tab title
+    fetch("https://www.youtube.com/oembed?url=" + encodeURIComponent(videoUrl) + "&format=json")
+      .then(response => response.json())
+      .then(data => {
+        document.title = data.title;
+        document.getElementById("videoTitle").textContent = data.title;
 
-        const tag = document.createElement('script');
-        tag.src = "https://youtube.com";
-        const firstScriptTag = document.getElementsByTagName('script');
-        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+        // Update meta titles after page load
+        document.querySelector('meta[property="og:title"]').setAttribute("content", data.title);
+        document.querySelector('meta[name="twitter:title"]').setAttribute("content", data.title);
+      })
+      .catch(() => {
+        document.title = "YouTube Audio";
+        document.getElementById("videoTitle").textContent = "YouTube Audio";
+      });
 
-        function onYouTubeIframeAPIReady() {
-            player = new YT.Player('youtube-audio-player', {
-                height: '200',  
-                width: '200',   
-                videoId: youtubeVideoId,
-                playerVars: {
-                    'autoplay': 1,               
-                    'mute': 1,                   
-                    'loop': 1,                   
-                    'playlist': youtubeVideoId,  
-                    'controls': 0,               
-                    'disablekb': 1,             
-                    'modestbranding': 1
-                },
-                events: {
-                    'onReady': onPlayerReady
-                }
-            });
+    // Load YouTube iframe API
+    const tag = document.createElement("script");
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.body.appendChild(tag);
+
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player("player", {
+        videoId: videoId,
+        playerVars: {
+          autoplay: 1,
+          controls: 0,
+          loop: 1,
+          playlist: videoId,
+          modestbranding: 1
+        },
+        events: {
+          onReady: onPlayerReady,
+          onStateChange: onPlayerStateChange
         }
+      });
+    }
 
-        function onPlayerReady(event) {
-            isPlayerReady = true;
-            
-            // FIX: Inject the specific referrer policy parameters required for cross-origin hosting
-            const iframe = document.getElementById('youtube-audio-player');
-            if (iframe) {
-                iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
-            }
-            
-            player.playVideo(); 
-        }
+    function onPlayerReady(event) {
+      try {
+        event.target.unMute();
+        event.target.setVolume(100);
+        event.target.playVideo();
+      } catch (e) {
+        showPlayButton();
+      }
 
-        function unlockAudio() {
-            const gate = document.getElementById('audio-gate');
-            
-            if (player && isPlayerReady) {
-                player.unMute();
-                player.setVolume(100);
-                player.playVideo(); 
-                gate.classList.add('hidden');
-            } else {
-                // Instantly re-try execution loop if API state is still buffering
-                setTimeout(unlockAudio, 100);
-            }
+      setTimeout(() => {
+        if (!hasStarted) {
+          showPlayButton();
         }
-    </script>
+      }, 2000);
+    }
+
+    function onPlayerStateChange(event) {
+      if (event.data === YT.PlayerState.PLAYING) {
+        hasStarted = true;
+        document.getElementById("status").textContent = "Audio is playing.";
+        document.getElementById("playButton").style.display = "none";
+      }
+    }
+
+    function showPlayButton() {
+      document.getElementById("status").textContent =
+        "Your browser blocked autoplay with sound.";
+      document.getElementById("playButton").style.display = "inline-block";
+    }
+
+    document.getElementById("playButton").addEventListener("click", () => {
+      player.unMute();
+      player.setVolume(100);
+      player.playVideo();
+    });
+  </script>
 </body>
 </html>
