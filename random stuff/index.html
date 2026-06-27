@@ -6,14 +6,14 @@
     <title>Socrates Phonk - Audio Loop</title>
 
     <!-- DISCORD & SOCIAL MEDIA PREVIEW EMBEDS -->
-    <!-- The meta tag is perfectly configured to scrape the official Socrates Phonk cover art -->
     <meta property="og:url" content="https://burning-calamity.github.io/op-message-encryptor-and-decryptor/random%20stuff/index.html">
     <meta property="og:type" content="website">
     <meta property="og:title" content="SOCRATES PHONK">
     <meta property="og:description" content="Listen to the heat. Auto-playing audio loop.">
+    <!-- FIX: Pulled directly from YouTube's HQ server asset file for this exact video -->
     <meta property="og:image" content="https://youtube.com">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
+    <meta property="og:image:width" content="480">
+    <meta property="og:image:height" content="360">
     <meta name="twitter:card" content="summary_large_image">
 
     <style>
@@ -30,14 +30,13 @@
             overflow: hidden;
         }
 
-        /* Full screen overlay acting as an interactive bridge for browser audio policies */
         .click-overlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(15, 12, 32, 0.95);
+            background: rgba(15, 12, 32, 0.98);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -82,8 +81,7 @@
             100% { opacity: 0.4; }
         }
 
-        /* FIX: Making the player size 200x200 pixels but positioning it completely off-screen */
-        /* This tricks the browser engine into treating it as an active visible playback node */
+        /* The frame is kept safe from layout engine visibility drops by hiding offscreen */
         #player-wrapper {
             position: absolute;
             top: -9999px;
@@ -97,7 +95,7 @@
 </head>
 <body>
 
-    <!-- FIX: Moved the onclick function directly to the gate overlay so the browser registers the user interaction -->
+    <!-- FIX: Moved onclick event handling here so the action bubbles properly -->
     <div class="click-overlay" id="audio-gate" onclick="unlockAudio()">
         <h1>SOCRATES PHONK</h1>
         <p>Listen to the heat...</p>
@@ -106,9 +104,9 @@
 
     <div class="main-content">
         <h1>Now Playing Loop</h1>
+        <p style="color: #666; font-size: 0.9rem;">Audio running through embedded wrapper</p>
     </div>
 
-    <!-- Hidden Wrapper for YouTube player framework -->
     <div id="player-wrapper">
         <div id="youtube-audio-player"></div>
     </div>
@@ -118,20 +116,19 @@
         let player;
         let isPlayerReady = false;
 
-        // Load the YouTube IFrame API
         const tag = document.createElement('script');
-        tag.src = "https://www.youtube.com/iframe_api";
+        tag.src = "https://youtube.com";
         const firstScriptTag = document.getElementsByTagName('script');
         firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
         function onYouTubeIframeAPIReady() {
             player = new YT.Player('youtube-audio-player', {
-                height: '200',  // FIX: Set explicit non-zero dimensions
-                width: '200',   // FIX: Set explicit non-zero dimensions
+                height: '200',  
+                width: '200',   
                 videoId: youtubeVideoId,
                 playerVars: {
                     'autoplay': 1,               
-                    'mute': 1,                   // Keeps browser background blocking engine calm
+                    'mute': 1,                   
                     'loop': 1,                   
                     'playlist': youtubeVideoId,  
                     'controls': 0,               
@@ -146,7 +143,14 @@
 
         function onPlayerReady(event) {
             isPlayerReady = true;
-            player.playVideo(); // Pre-buffers track state silently in background
+            
+            // FIX: Inject the specific referrer policy parameters required for cross-origin hosting
+            const iframe = document.getElementById('youtube-audio-player');
+            if (iframe) {
+                iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+            }
+            
+            player.playVideo(); 
         }
 
         function unlockAudio() {
@@ -156,12 +160,10 @@
                 player.unMute();
                 player.setVolume(100);
                 player.playVideo(); 
-                
-                // Smoothly dismiss entry sequence layout
                 gate.classList.add('hidden');
             } else {
-                // If clicked prematurely before API is complete, fallback kick execution loop
-                setTimeout(unlockAudio, 200);
+                // Instantly re-try execution loop if API state is still buffering
+                setTimeout(unlockAudio, 100);
             }
         }
     </script>
