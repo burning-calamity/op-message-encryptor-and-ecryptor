@@ -1,9 +1,25 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Socrates Phonk</title>
+    <title>Socrates Phonk - Audio Loop</title>
+
+    <!-- DISCORD & SOCIAL MEDIA PREVIEW EMBEDS (Open Graph Tags) -->
+    <!-- Replace 'https://yourwebsite.com' with your actual live website link -->
+    <meta property="og:url" content="https://www.youtube.com/watch?v=AaIBMfdtR6M">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="SOCRATES PHONK">
+    <meta property="og:description" content="Listen to the heat. Auto-playing audio loop.">
+    
+    <!-- This fetches the maximum resolution thumbnail directly from the YouTube video -->
+    <meta property="og:image" content="https://youtube.com">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+
+    <!-- Twitter / Discord Large Card Fallback -->
+    <meta name="twitter:card" content="summary_large_image">
+
     <style>
         body {
             margin: 0;
@@ -18,9 +34,27 @@
             overflow: hidden;
         }
 
-        .container {
-            text-align: center;
-            z-index: 2;
+        /* Full screen overlay acting as an interactive bridge for browser audio policies */
+        .click-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 12, 32, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+            cursor: pointer;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+
+        .click-overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
         }
 
         h1 {
@@ -33,27 +67,23 @@
         }
 
         p {
-            font-size: 1.1rem;
+            font-size: 1.2rem;
             color: #8a85a5;
-            margin-bottom: 30px;
+            margin: 0 0 20px 0;
         }
 
-        .enter-btn {
-            background: linear-gradient(45deg, #00ffcc, #0077ff);
-            color: #060210;
-            border: none;
-            padding: 18px 50px;
-            font-size: 1.3rem;
-            font-weight: bold;
-            border-radius: 40px;
-            cursor: pointer;
-            box-shadow: 0 5px 25px rgba(0, 255, 204, 0.4);
-            transition: all 0.3s ease;
+        .pulse-text {
+            font-size: 0.9rem;
+            color: #00ffcc;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            animation: pulse 1.5s infinite;
         }
 
-        .enter-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 30px rgba(0, 255, 204, 0.6);
+        @keyframes pulse {
+            0% { opacity: 0.4; }
+            50% { opacity: 1; }
+            100% { opacity: 0.4; }
         }
 
         #youtube-audio-player {
@@ -61,39 +91,44 @@
         }
     </style>
 </head>
-<body>
+<!-- Clicking anywhere on the screen triggers the audio unblock sequence -->
+<body onclick="unlockAudio()">
 
-    <div class="container">
+    <!-- Overlay that clears browser restrictions -->
+    <div class="click-overlay" id="audio-gate">
         <h1>SOCRATES PHONK</h1>
         <p>Listen to the heat...</p>
-        <button class="enter-btn" id="start-btn" onclick="activateAudio()">Listen</button>
+        <div class="pulse-text">Click anywhere to enter & play</div>
+    </div>
+
+    <div class="main-content">
+        <h1>Now Playing Loop</h1>
     </div>
 
     <!-- Hidden YouTube iframe container -->
     <div id="youtube-audio-player"></div>
 
     <script>
-        // Target Video ID for Socrates Phonk
         const youtubeVideoId = 'AaIBMfdtR6M'; 
         let player;
         let isPlayerReady = false;
 
         // Load the YouTube IFrame API
         const tag = document.createElement('script');
-        tag.src = "https://www.youtube.com/iframe_api";
+        tag.src = "https://youtube.com";
         const firstScriptTag = document.getElementsByTagName('script');
         firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
-        // Configure player to loop seamlessly and play as soon as it initializes
         function onYouTubeIframeAPIReady() {
             player = new YT.Player('youtube-audio-player', {
                 height: '0',
                 width: '0',
                 videoId: youtubeVideoId,
                 playerVars: {
-                    'autoplay': 1,               // Forces autoplay instantly upon loading
-                    'loop': 1,                   // Enables looping
-                    'playlist': youtubeVideoId,  // YouTube requires the video ID repeated here to loop a single video
+                    'autoplay': 1,               // Load and buffer immediately
+                    'mute': 1,                   // Start muted to bypass browser block policies
+                    'loop': 1,                   
+                    'playlist': youtubeVideoId,  
                     'controls': 0,               
                     'disablekb': 1,             
                     'modestbranding': 1
@@ -104,26 +139,23 @@
             });
         }
 
-        // Fires the exact moment the video loads and is ready for playback
         function onPlayerReady(event) {
             isPlayerReady = true;
-            // Attempt an unmuted play immediately in case the browser allows it
+            // The video starts playing muted immediately upon loading
             player.playVideo(); 
         }
 
-        // Activates/unblocks audio instantly when the user clicks the layout
-        function activateAudio() {
-            const startBtn = document.getElementById('start-btn');
+        // Unmutes and plays audio the moment the user clicks anywhere
+        function unlockAudio() {
+            const gate = document.getElementById('audio-gate');
             
-            if (player) {
-                player.playVideo();
-                startBtn.innerText = "Playing Loop...";
-                startBtn.style.background = "#1a1630";
-                startBtn.style.color = "#666";
-                startBtn.style.boxShadow = "none";
-                startBtn.disabled = true;
-            } else {
-                startBtn.innerText = "Loading track...";
+            if (player && isPlayerReady) {
+                player.unMute();
+                player.setVolume(100);
+                player.playVideo(); // Ensures it plays even if paused
+                
+                // Smoothly hide the landing screen overlay
+                gate.classList.add('hidden');
             }
         }
     </script>
