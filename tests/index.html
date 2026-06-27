@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Loading...</title>
+
+  <!-- 
+    IMPORTANT:
+    Most apps like Discord, WhatsApp, Facebook, etc. do NOT run JavaScript
+    when creating link previews.
+
+    So these Open Graph tags cannot be fully automatic in pure HTML/JS.
+    They are updated for the browser, but link previews usually need
+    server-side generated meta tags.
+  -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="YouTube Audio" />
+  <meta property="og:description" content="Listen to this YouTube audio." />
+  <meta property="og:image" content="" />
+  <meta property="og:url" content="" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="YouTube Audio" />
+  <meta name="twitter:description" content="Listen to this YouTube audio." />
+  <meta name="twitter:image" content="" />
+
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #111;
+      color: white;
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+
+    #player {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .box {
+      max-width: 600px;
+      padding: 20px;
+    }
+
+    img {
+      width: 100%;
+      max-width: 500px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
+
+    button {
+      padding: 14px 24px;
+      font-size: 18px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: white;
+      color: black;
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="player"></div>
+
+  <div class="box">
+    <img id="thumbnail" src="" alt="YouTube thumbnail">
+    <h1 id="videoTitle">Loading...</h1>
+    <p id="status">Trying to play audio automatically...</p>
+    <button id="playButton">Click to play audio</button>
+  </div>
+
+  <script>
+    /*
+      Change only this variable.
+    */
+    const videoLink = "https://www.youtube.com/watch?v=AaIBMfdtR6M";
+
+    let videoId;
+    let player;
+    let hasStarted = false;
+
+    function getYouTubeVideoId(url) {
+      const patterns = [
+        /youtube\.com\/watch\?v=([^&]+)/,
+        /youtu\.be\/([^?&]+)/,
+        /youtube\.com\/embed\/([^?&]+)/,
+        /youtube\.com\/shorts\/([^?&]+)/
+      ];
+
+      for (const pattern of patterns) {
+        const match = url.match(pattern);
+        if (match) return match[1];
+      }
+
+      return null;
+    }
+
+    function setMeta(selector, value) {
+      const tag = document.querySelector(selector);
+      if (tag) tag.setAttribute("content", value);
+    }
+
+    videoId = getYouTubeVideoId(videoLink);
+
+    if (!videoId) {
+      document.title = "Invalid YouTube link";
+      document.getElementById("videoTitle").textContent = "Invalid YouTube link";
+      document.getElementById("status").textContent = "Please check the videoLink variable.";
+      throw new Error("Invalid YouTube link");
+    }
+
+    const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+
+    document.getElementById("thumbnail").src = thumbnailUrl;
+
+    setMeta('meta[property="og:image"]', thumbnailUrl);
+    setMeta('meta[name="twitter:image"]', thumbnailUrl);
+    setMeta('meta[property="og:url"]', window.location.href);
+
+    fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(videoLink)}&format=json`)
+      .then(response => response.json())
+      .then(data => {
+        const title = data.title;
+        const thumbnail = data.thumbnail_url || thumbnailUrl;
+
+        document.title = title;
+        document.getElementById("videoTitle").textContent = title;
+        document.getElementById("thumbnail").src = thumbnail;
+
+        setMeta('meta[property="og:title"]', title);
+        setMeta('meta[name="twitter:title"]', title);
+        setMeta('meta[property="og:image"]', thumbnail);
+        setMeta('meta[name="twitter:image"]', thumbnail);
+      })
+      .catch(() => {
+        document.title = "YouTube Audio";
+        document.getElementById("videoTitle").textContent = "YouTube Audio";
+      });
+
+    const tag = document.createElement("script");
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.body.appendChild(tag);
+
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player("player", {
+        videoId: videoId,
+        playerVars: {
+          autoplay: 1,
+          controls: 0,
+          loop: 1,
+          playlist: videoId,
+          modestbranding: 1
+        },
+        events: {
+          onReady: onPlayerReady,
+          onStateChange: onPlayerStateChange
+        }
+      });
+    }
+
+    function onPlayerReady(event) {
+      try {
+        event.target.unMute();
+        event.target.setVolume(100);
+        event.target.playVideo();
+      } catch (error) {
+        showPlayButton();
+      }
+
+      setTimeout(() => {
+        if (!hasStarted) {
+          showPlayButton();
+        }
+      }, 2000);
+    }
+
+    function onPlayerStateChange(event) {
+      if (event.data === YT.PlayerState.PLAYING) {
+        hasStarted = true;
+        document.getElementById("status").textContent = "Audio is playing.";
+        document.getElementById("playButton").style.display = "none";
+      }
+    }
+
+    function showPlayButton() {
+      document.getElementById("status").textContent =
+        "Your browser blocked autoplay with sound.";
+      document.getElementById("playButton").style.display = "inline-block";
+    }
+
+    document.getElementById("playButton").addEventListener("click", () => {
+      player.unMute();
+      player.setVolume(100);
+      player.playVideo();
+    });
+  </script>
+</body>
+</html>
