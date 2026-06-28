@@ -35,7 +35,7 @@ import textwrap
 import unicodedata
 import urllib.parse
 import zlib
-from typing import List, Tuple, Dict, Iterable, Optional
+from typing import List, Tuple, Dict, Iterable, Optional, Iterator
 
 # GUI & CLI come in Part 2
 try:
@@ -2998,6 +2998,190 @@ def HagelinToy_encode(text: str, seed: str = "HAGELIN", wheels: str = "17,19,21,
 
 def HagelinToy_decode(text: str, seed: str = "HAGELIN", wheels: str = "17,19,21,23,25,26") -> str:
     stream = _hagelin_stream(seed, wheels)
+    out = []
+    for ch in text:
+        up = ch.upper()
+        if up in ALPHA_SET:
+            k = next(stream)
+            mapped = ALPHA[(ALPHA.index(up) - k) % 26]
+            out.append(mapped if ch.isupper() else mapped.lower())
+        else:
+            out.append(ch)
+    return "".join(out)
+
+_ENIGMA_ROTORS = {
+    "I": ("EKMFLGDQVZNTOWYHXUSPAIBRCJ", "Q"),
+    "II": ("AJDKSIRUXBLHWTMCQGZNPYFVOE", "E"),
+    "III": ("BDFHJLCPRTXVZNYEIWGAKMUSQO", "V"),
+    "IV": ("ESOVPZJAYQUIRHXLNFTGKDCMWB", "J"),
+    "V": ("VZBRGITYUPSDNHLXAWMJQOFECK", "Z"),
+}
+_ENIGMA_REFLECTORS = {
+    "B": "YRUHQSLDPXNGOKMIEBFZCWVJAT",
+    "C": "FVPJIAOYEDRZXWGCTKUQSBNMHL",
+}
+
+def _enigma_parse_rotors(rotors: str) -> List[str]:
+    parts = [p.strip().upper() for p in re.split(r"[,\s-]+", str(rotors)) if p.strip()]
+    if not parts:
+        parts = ["I", "II", "III"]
+    out = []
+    for part in parts[:3]:
+        if part not in _ENIGMA_ROTORS:
+            raise ValueError(f"unknown rotor {part!r}")
+        out.append(part)
+    while len(out) < 3:
+        out.append(["I", "II", "III"][len(out)])
+    return out
+
+def _enigma_positions(setting: str) -> List[int]:
+    letters = [ch for ch in str(setting).upper() if ch in ALPHA]
+    letters = (letters + list("AAA"))[:3]
+    return [ALPHA.index(ch) for ch in letters]
+
+def _enigma_plugboard_pairs(plugboard: str) -> Dict[str, str]:
+    pairs: Dict[str, str] = {}
+    for token in re.split(r"[\s,;]+", str(plugboard).upper()):
+        token = "".join(ch for ch in token if ch in ALPHA)
+        if len(token) != 2 or token[0] == token[1]:
+            continue
+        a, b = token
+        if a in pairs or b in pairs:
+            continue
+        pairs[a] = b
+        pairs[b] = a
+    return pairs
+
+def _enigma_step(rotor_names: List[str], pos: List[int]) -> None:
+    notches = [_ENIGMA_ROTORS[name][1] for name in rotor_names]
+    if ALPHA[pos[1]] in notches[1]:
+        pos[0] = (pos[0] + 1) % 26
+        pos[1] = (pos[1] + 1) % 26
+    if ALPHA[pos[2]] in notches[2]:
+        pos[1] = (pos[1] + 1) % 26
+    pos[2] = (pos[2] + 1) % 26
+
+def _enigma_forward(idx: int, wiring: str, pos: int, ring: int) -> int:
+    shifted = (idx + pos - ring) % 26
+    wired = ALPHA.index(wiring[shifted])
+    return (wired - pos + ring) % 26
+
+def _enigma_backward(idx: int, wiring: str, pos: int, ring: int) -> int:
+    shifted = (idx + pos - ring) % 26
+    wired = wiring.index(ALPHA[shifted])
+    return (wired - pos + ring) % 26
+
+def EnigmaI_encode(text: str, rotors: str = "I II III", reflector: str = "B", ring: str = "AAA", setting: str = "AAA", plugboard: str = "") -> str:
+    """Enigma I style rotor machine simulation with three rotors and plugboard."""
+    rotor_names = _enigma_parse_rotors(rotors)
+    reflector_wiring = _ENIGMA_REFLECTORS.get(str(reflector).upper(), _ENIGMA_REFLECTORS["B"])
+    rings = _enigma_positions(ring)
+    pos = _enigma_positions(setting)
+    plugs = _enigma_plugboard_pairs(plugboard)
+    wirings = [_ENIGMA_ROTORS[name][0] for name in rotor_names]
+    out = []
+    for ch in text:
+        up = ch.upper()
+        if up not in ALPHA_SET:
+            out.append(ch)
+            continue
+        _enigma_step(rotor_names, pos)
+        up = plugs.get(up, up)
+        idx = ALPHA.index(up)
+        for i in (2, 1, 0):
+            idx = _enigma_forward(idx, wirings[i], pos[i], rings[i])
+        idx = ALPHA.index(reflector_wiring[idx])
+        for i in (0, 1, 2):
+            idx = _enigma_backward(idx, wirings[i], pos[i], rings[i])
+        mapped = plugs.get(ALPHA[idx], ALPHA[idx])
+        out.append(mapped if ch.isupper() else mapped.lower())
+    return "".join(out)
+
+def EnigmaI_decode(text: str, rotors: str = "I II III", reflector: str = "B", ring: str = "AAA", setting: str = "AAA", plugboard: str = "") -> str:
+    return EnigmaI_encode(text, rotors, reflector, ring, setting, plugboard)
+
+def _m209_stream(key: str, wheels: str = "26,25,23,21,19,17") -> Iterator[int]:
+    periods = [max(2, int(x.strip())) for x in str(wheels).split(",") if x.strip()] or [26, 25, 23, 21, 19, 17]
+    seed = sum((i + 1) * ord(ch) for i, ch in enumerate(key or "M209")) or 1
+    positions = [(seed + i * 7) % p for i, p in enumerate(periods)]
+    while True:
+        active = 0
+        for i, p in enumerate(periods):
+            pin = ((positions[i] * 1103515245 + seed + i * 12345) >> (i + 3)) & 1
+            if pin:
+                active += i + 1
+            positions[i] = (positions[i] + 1) % p
+        seed = (seed * 1664525 + 1013904223 + active) & 0xFFFFFFFF
+        yield (active * 3 + seed) % 26
+
+def M209_encode(text: str, key: str = "M209", wheels: str = "26,25,23,21,19,17") -> str:
+    """M-209/Hagelin inspired pin-wheel stream cipher."""
+    stream = _m209_stream(key, wheels)
+    out = []
+    for ch in text:
+        up = ch.upper()
+        if up in ALPHA_SET:
+            k = next(stream)
+            mapped = ALPHA[(ALPHA.index(up) + k) % 26]
+            out.append(mapped if ch.isupper() else mapped.lower())
+        else:
+            out.append(ch)
+    return "".join(out)
+
+def M209_decode(text: str, key: str = "M209", wheels: str = "26,25,23,21,19,17") -> str:
+    stream = _m209_stream(key, wheels)
+    out = []
+    for ch in text:
+        up = ch.upper()
+        if up in ALPHA_SET:
+            k = next(stream)
+            mapped = ALPHA[(ALPHA.index(up) - k) % 26]
+            out.append(mapped if ch.isupper() else mapped.lower())
+        else:
+            out.append(ch)
+    return "".join(out)
+
+def Typex_encode(text: str, rotors: str = "IV V II", reflector: str = "C", ring: str = "AAA", setting: str = "AAA", plugboard: str = "") -> str:
+    """British Typex-inspired rotor machine profile using the Enigma engine."""
+    return EnigmaI_encode(text, rotors, reflector, ring, setting, plugboard)
+
+def Typex_decode(text: str, rotors: str = "IV V II", reflector: str = "C", ring: str = "AAA", setting: str = "AAA", plugboard: str = "") -> str:
+    return Typex_encode(text, rotors, reflector, ring, setting, plugboard)
+
+def _sigaba_stream(key: str = "SIGABA", control: str = "CONTROL") -> Iterator[int]:
+    seed = sum((i + 1) * ord(ch) for i, ch in enumerate((key or "SIGABA") + (control or "CONTROL"))) or 1
+    cipher_rotors = [(seed + 11 * i) % 26 for i in range(5)]
+    control_rotors = [(seed // (i + 2) + 7 * i) % 26 for i in range(5)]
+    index_rotors = [(seed // (i + 5) + 3 * i) % 10 for i in range(5)]
+    while True:
+        control_sum = sum((control_rotors[i] * (i + 3) + index_rotors[i]) for i in range(5))
+        moving = {control_sum % 5, (control_sum // 5) % 5}
+        shift = 0
+        for i in range(5):
+            if i in moving:
+                cipher_rotors[i] = (cipher_rotors[i] + 1 + index_rotors[i]) % 26
+            control_rotors[i] = (control_rotors[i] + 1 + (seed >> i)) % 26
+            index_rotors[i] = (index_rotors[i] + control_rotors[i] + i) % 10
+            shift += cipher_rotors[i] * (i + 1)
+        seed = (seed * 1103515245 + 12345 + shift) & 0x7FFFFFFF
+        yield shift % 26
+
+def SIGABAToy_encode(text: str, key: str = "SIGABA", control: str = "CONTROL") -> str:
+    """SIGABA-inspired rotor-controlled stream cipher."""
+    stream = _sigaba_stream(key, control)
+    out = []
+    for ch in text:
+        up = ch.upper()
+        if up in ALPHA_SET:
+            k = next(stream)
+            mapped = ALPHA[(ALPHA.index(up) + k) % 26]
+            out.append(mapped if ch.isupper() else mapped.lower())
+        else:
+            out.append(ch)
+    return "".join(out)
+
+def SIGABAToy_decode(text: str, key: str = "SIGABA", control: str = "CONTROL") -> str:
+    stream = _sigaba_stream(key, control)
     out = []
     for ch in text:
         up = ch.upper()
@@ -9277,6 +9461,10 @@ def get_registry() -> List[CipherEntry]:
         CipherEntry("Turning Cardan Grille", TurningCardanGrille_encode, TurningCardanGrille_decode, [P("size","Size","4"), P("mask","Mask","1100110000000000"), P("pad","Pad","X")]),
         CipherEntry("Raster Bits", RasterBits_encode, RasterBits_decode, [P("width","Width","8"), P("on","On char","#"), P("off","Off char",".")]),
         CipherEntry("Hagelin Toy", HagelinToy_encode, HagelinToy_decode, [P("seed","Seed","HAGELIN"), P("wheels","Wheels","17,19,21,23,25,26")]),
+        CipherEntry("Enigma I", EnigmaI_encode, EnigmaI_decode, [P("rotors","Rotors","I II III"), P("reflector","Reflector","B"), P("ring","Ring setting","AAA"), P("setting","Message setting","AAA"), P("plugboard","Plugboard pairs","")]),
+        CipherEntry("M-209", M209_encode, M209_decode, [P("key","Key","M209"), P("wheels","Wheel periods","26,25,23,21,19,17")]),
+        CipherEntry("Typex", Typex_encode, Typex_decode, [P("rotors","Rotors","IV V II"), P("reflector","Reflector","C"), P("ring","Ring setting","AAA"), P("setting","Message setting","AAA"), P("plugboard","Plugboard pairs","")]),
+        CipherEntry("SIGABA Toy", SIGABAToy_encode, SIGABAToy_decode, [P("key","Key","SIGABA"), P("control","Control key","CONTROL")]),
         CipherEntry("AMSCO", AMSCO_encode, AMSCO_decode, [P("key","Key","CIPHER"), P("start_len","Starting cell length","1")]),
         CipherEntry("Bazeries", Bazeries_encode, Bazeries_decode, [P("number","Number key","31415"), P("key","Alphabet key","BAZERIES")]),
         CipherEntry("Disrupted Transposition", DisruptedTransposition_encode, DisruptedTransposition_decode, [P("key","Key","DISRUPT"), P("pad","Pad","X")]),
